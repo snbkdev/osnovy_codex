@@ -15,3 +15,50 @@ env/
 ._*
 
 info.txt
+
+# Uptime App (Go + Next.js)
+# Local environment (keep configuration examples)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Go backend: builds, development reloaders and test artifacts
+/uptime_app/backend/bin/
+/uptime_app/backend/tmp/
+/uptime_app/backend/api
+*.test
+*.prof
+/uptime_app/backend/coverage.out
+/uptime_app/backend/coverage.html
+
+# Next.js frontend: dependencies, builds and generated types
+/uptime_app/frontend/node_modules/
+/uptime_app/frontend/.next/
+/uptime_app/frontend/out/
+/uptime_app/frontend/.vercel/
+/uptime_app/frontend/next-env.d.ts
+*.tsbuildinfo
+
+# Test coverage and tool caches
+coverage/
+.cache/
+.eslintcache
+
+# Runtime and package-manager logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local editor and operating-system files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
