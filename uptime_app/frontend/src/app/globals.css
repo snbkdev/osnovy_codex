@@ -8,3 +8,13 @@ section { margin-top: 32px; padding: 24px; background: white; border: 1px solid 
 button { background: #4338ca; color: white; border: 0; border-radius: 6px; padding: 12px 18px; font: inherit; cursor: pointer; }
 button:disabled { opacity: .6; cursor: wait; }
 button:focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+
+a { color: #4338ca; }
+a:focus-visible, input:focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+nav { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 20px; }
+form { display: grid; gap: 20px; }
+label { display: grid; gap: 8px; font-weight: 600; }
+input { width: 100%; padding: 12px; border: 1px solid #aab4c6; border-radius: 6px; font: inherit; }
+.field-hint { margin-top: -12px; color: #526078; font-size: 14px; font-weight: 400; }
+[role="alert"] { color: #a21d28; }
+@media (max-width: 600px) { main { margin: 5vh auto; padding: 20px; } }

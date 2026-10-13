@@ -10,8 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"uptime_app/backend/internal/auth"
 	"uptime_app/backend/internal/config"
 	"uptime_app/backend/internal/httpapi"
+	"uptime_app/backend/internal/mail"
+	"uptime_app/backend/internal/storage"
 )
 
 func main() {
@@ -22,12 +25,33 @@ func main() {
 }
 
 func run() error {
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	db, err := storage.Open(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	cipher, err := auth.NewCipher(cfg.MailKey)
+	if err != nil {
+		return err
+	}
+	service, err := auth.NewService(&storage.AuthRepository{DB: db}, auth.Signer{Key: cfg.JWTKey, Issuer: cfg.Issuer, Audience: cfg.Audience}, cipher, cfg.PublicURL)
+	if err != nil {
+		return err
+	}
+	worker := &storage.MailWorker{DB: db, Cipher: cipher, Sender: mail.SMTP{Addr: cfg.SMTPAddr, User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.MailFrom, AllowInsecure: cfg.SMTPInsecure}}
+	workerCtx, workerCancel := context.WithCancel(ctx)
+	workerDone := make(chan struct{})
+	go func() { defer close(workerDone); worker.Run(workerCtx) }()
+	defer func() { workerCancel(); <-workerDone }()
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewRouter(),
+		Handler:           httpapi.NewAuthRouter(service, cfg),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
