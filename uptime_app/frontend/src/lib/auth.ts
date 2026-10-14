@@ -1,4 +1,4 @@
-export type User = { id: string; email: string; email_verified: boolean };
+export type User = { id: string; email: string; email_verified: boolean; full_name: string; date_of_birth: string | null };
 export type TokenResponse = { access_token: string; token_type: "Bearer"; expires_in: number; user: User };
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -94,3 +94,10 @@ export async function authRequest<T>(path: string, body?: unknown): Promise<T> {
   }
 }
 export const publicAuthRequest = <T = { message: string }>(path: string, body: unknown) => request<T>(path, body);
+
+export async function saveProfile(fullName: string, dateOfBirth: string) {
+  const started = generation;
+  const user = await authRequest<User>("profile", { full_name: fullName, date_of_birth: dateOfBirth || null });
+  if (started === generation && state.user?.id === user.id) update({ ...state, user });
+  return user;
+}

@@ -15,7 +15,7 @@ type AuthRepository struct{ DB *bun.DB }
 var _ auth.Repository = (*AuthRepository)(nil)
 
 func publicUser(u userRow) auth.User {
-	return auth.User{ID: u.ID, Email: u.Email, PasswordHash: u.PasswordHash, EmailVerified: u.EmailVerified}
+	return auth.User{ID: u.ID, Email: u.Email, PasswordHash: u.PasswordHash, EmailVerified: u.EmailVerified, FullName: u.FullName, DateOfBirth: u.DateOfBirth}
 }
 func missing(err, replacement error) error {
 	if errors.Is(err, sql.ErrNoRows) {

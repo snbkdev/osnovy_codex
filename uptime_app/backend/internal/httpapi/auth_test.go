@@ -18,6 +18,11 @@ type stubService struct {
 	calls int
 }
 
+func (s *stubService) UpdateProfile(_ context.Context, _ string, name string, _ *string) (auth.User, error) {
+	s.calls++
+	return auth.User{ID: "id", Email: "a@example.com", FullName: name, EmailVerified: true}, s.err
+}
+
 func (s *stubService) Register(context.Context, string, string) error  { s.calls++; return s.err }
 func (s *stubService) SendToken(context.Context, string, string) error { s.calls++; return s.err }
 func (s *stubService) Verify(context.Context, string) error            { return s.err }
@@ -52,7 +57,7 @@ func TestAuthContracts(t *testing.T) {
 		}
 	}
 	w := req(h, "POST", "login", `{"email":"a@example.com","password":"long password"}`, cfg.PublicURL)
-	if w.Code != 200 || !strings.Contains(w.Body.String(), `"expires_in":900`) || strings.Contains(w.Body.String(), "secret") || strings.Contains(w.Body.String(), "refresh") {
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"expires_in":86400`) || strings.Contains(w.Body.String(), "secret") || strings.Contains(w.Body.String(), "refresh") {
 		t.Fatalf("%d %s", w.Code, w.Body.String())
 	}
 	cookies := w.Result().Cookies()

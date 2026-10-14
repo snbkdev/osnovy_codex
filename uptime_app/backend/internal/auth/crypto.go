@@ -79,13 +79,15 @@ type Signer struct {
 	Issuer, Audience string
 }
 
+const AccessTokenLifetime = 24 * time.Hour
+
 func (s Signer) Issue(userID, sessionID string, now time.Time) (string, error) {
-	return jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{SessionID: sessionID, RegisteredClaims: jwt.RegisteredClaims{Subject: userID, Issuer: s.Issuer, Audience: jwt.ClaimStrings{s.Audience}, IssuedAt: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute))}}).SignedString(s.Key)
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{SessionID: sessionID, RegisteredClaims: jwt.RegisteredClaims{Subject: userID, Issuer: s.Issuer, Audience: jwt.ClaimStrings{s.Audience}, IssuedAt: jwt.NewNumericDate(now), ExpiresAt: jwt.NewNumericDate(now.Add(AccessTokenLifetime))}}).SignedString(s.Key)
 }
 func (s Signer) Parse(value string, now time.Time) (Claims, error) {
 	var c Claims
 	_, err := jwt.ParseWithClaims(value, &c, func(t *jwt.Token) (any, error) { return s.Key, nil }, jwt.WithValidMethods([]string{"HS256"}), jwt.WithIssuer(s.Issuer), jwt.WithAudience(s.Audience), jwt.WithExpirationRequired(), jwt.WithIssuedAt(), jwt.WithTimeFunc(func() time.Time { return now }))
-	if err != nil || c.Subject == "" || c.SessionID == "" || c.IssuedAt == nil || c.ExpiresAt == nil || !c.ExpiresAt.After(c.IssuedAt.Time) || c.ExpiresAt.Sub(c.IssuedAt.Time) > 15*time.Minute {
+	if err != nil || c.Subject == "" || c.SessionID == "" || c.IssuedAt == nil || c.ExpiresAt == nil || !c.ExpiresAt.After(c.IssuedAt.Time) || c.ExpiresAt.Sub(c.IssuedAt.Time) > AccessTokenLifetime {
 		return Claims{}, ErrUnauthorized
 	}
 	return c, nil

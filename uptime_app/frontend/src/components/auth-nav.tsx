@@ -32,14 +32,15 @@ export function AuthNav() {
     }
   }}>
     <summary aria-label={`Профиль пользователя ${state.user.email}`}>
-      <span className="dashboard-avatar" aria-hidden="true">{state.user.email[0].toUpperCase()}</span>
-      <span className="dashboard-profile-label">Профиль<span>{state.user.email}</span></span>
+      <span className="dashboard-avatar" aria-hidden="true">{(state.user.full_name || state.user.email)[0].toUpperCase()}</span>
+      <span className="dashboard-profile-label">{state.user.full_name || "Профиль"}<span>{state.user.email}</span></span>
       <span aria-hidden="true">⌄</span>
     </summary>
     <div className="dashboard-profile-panel">
       <h2>Профиль пользователя</h2>
       <p className="dashboard-profile-email">{state.user.email}</p>
       <p className="dashboard-profile-status">{state.user.email_verified ? "Email подтверждён" : "Email не подтверждён"}</p>
+      <Link href="/profile" onClick={() => { if (menu.current) menu.current.open = false; }}>Редактировать профиль</Link>
     </div>
     </details>
     <button className="dashboard-logout" disabled={busy} onClick={exit}>{busy ? "Выходим…" : "Выйти"}</button>

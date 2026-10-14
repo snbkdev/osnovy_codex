@@ -7,6 +7,8 @@ type userRow struct {
 	Email         string
 	PasswordHash  string
 	EmailVerified bool
+	FullName      string
+	DateOfBirth   *time.Time
 	CreatedAt     time.Time
 }
 type sessionRow struct {

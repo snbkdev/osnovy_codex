@@ -49,8 +49,20 @@ func TestJWT(t *testing.T) {
 	if err != nil || c.Subject != "user" || c.SessionID != "session" {
 		t.Fatalf("%+v %v", c, err)
 	}
-	if _, err := signer.Parse(token, now.Add(15*time.Minute)); err == nil {
+	if c.ExpiresAt.Sub(c.IssuedAt.Time) != 24*time.Hour {
+		t.Fatal("JWT lifetime must be 24 hours")
+	}
+	if _, err := signer.Parse(token, now.Add(24*time.Hour-time.Second)); err != nil {
+		t.Fatal("JWT expired before 24 hours")
+	}
+	if _, err := signer.Parse(token, now.Add(24*time.Hour)); err == nil {
 		t.Fatal("expired JWT accepted")
+	}
+	tooLong := c
+	tooLong.ExpiresAt = jwt.NewNumericDate(now.Add(24*time.Hour + time.Second))
+	invalid, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, tooLong).SignedString(signer.Key)
+	if _, err := signer.Parse(invalid, now); err == nil {
+		t.Fatal("JWT exceeding 24 hours accepted")
 	}
 	for _, bad := range []Signer{{bytes.Repeat([]byte{43}, 32), "issuer", "audience"}, {signer.Key, "wrong", "audience"}, {signer.Key, "issuer", "wrong"}} {
 		if _, err := bad.Parse(token, now); err == nil {

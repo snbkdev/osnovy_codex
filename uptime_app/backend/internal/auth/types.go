@@ -16,6 +16,8 @@ var (
 type User struct {
 	ID, Email, PasswordHash string
 	EmailVerified           bool
+	FullName                string
+	DateOfBirth             *time.Time
 }
 type Session struct {
 	ID, UserID string
@@ -38,4 +40,5 @@ type Repository interface {
 	Revoke(context.Context, string, time.Time) error
 	Reset(context.Context, string, string, time.Time) error
 	Current(context.Context, string, string, time.Time) (User, error)
+	UpdateProfile(context.Context, string, string, string, *time.Time, time.Time) (User, error)
 }

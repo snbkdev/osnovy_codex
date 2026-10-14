@@ -20,6 +20,7 @@ func newRouter(service authService, cfg config.Config) http.Handler {
 	})
 	if service != nil {
 		mux.Handle("/api/v1/auth/", &authHandler{service: service, config: cfg})
+		mux.Handle("POST /api/v1/auth/profile", requireAuth(service, http.HandlerFunc(profileHandler(service))))
 		mux.Handle("GET /api/v1/auth/me", requireAuth(service, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			user := r.Context().Value(userContextKey{}).(auth.User)
 			jsonResponse(w, 200, dto(user))

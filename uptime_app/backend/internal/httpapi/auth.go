@@ -27,15 +27,25 @@ type authService interface {
 	Logout(context.Context, string) error
 	Reset(context.Context, string, string) error
 	Me(context.Context, string) (auth.User, error)
+	UpdateProfile(context.Context, string, string, *string) (auth.User, error)
 }
 
 type userDTO struct {
-	ID            string `json:"id"`
-	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
+	ID            string  `json:"id"`
+	Email         string  `json:"email"`
+	EmailVerified bool    `json:"email_verified"`
+	FullName      string  `json:"full_name"`
+	DateOfBirth   *string `json:"date_of_birth"`
 }
 
-func dto(u auth.User) userDTO { return userDTO{u.ID, u.Email, u.EmailVerified} }
+func dto(u auth.User) userDTO {
+	var birthday *string
+	if u.DateOfBirth != nil {
+		value := u.DateOfBirth.Format("2006-01-02")
+		birthday = &value
+	}
+	return userDTO{ID: u.ID, Email: u.Email, EmailVerified: u.EmailVerified, FullName: u.FullName, DateOfBirth: birthday}
+}
 
 type authInput struct {
 	Email    string `json:"email"`
@@ -195,7 +205,7 @@ func refreshCookie(r *http.Request) string {
 }
 func (h *authHandler) tokens(w http.ResponseWriter, result auth.LoginResult) {
 	h.cookie(w, result.RefreshToken, false)
-	jsonResponse(w, 200, map[string]any{"access_token": result.AccessToken, "token_type": "Bearer", "expires_in": 900, "user": dto(result.User)})
+	jsonResponse(w, 200, map[string]any{"access_token": result.AccessToken, "token_type": "Bearer", "expires_in": int(auth.AccessTokenLifetime / time.Second), "user": dto(result.User)})
 }
 func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
