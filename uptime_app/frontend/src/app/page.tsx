@@ -1,12 +1,19 @@
+"use client";
+
+import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { AuthNav } from "@/components/auth-nav";
-import { ApiStatus } from "@/components/api-status";
+import { getAuthState, getServerAuthState, subscribeAuth } from "@/lib/auth";
 
 export default function Home() {
- return <main>
-  <p className="eyebrow">UPTIME APP</p>
-  <h1>Мониторинг доступности сервисов</h1>
-  <p>Основа приложения готова. Здесь появятся ваши сервисы и история проверок.</p>
-  <AuthNav />
-  <ApiStatus />
- </main>;
+ const { user } = useSyncExternalStore(subscribeAuth, getAuthState, getServerAuthState);
+ return <div className={user ? "dashboard" : undefined}>
+  {user && <header className="dashboard-header">
+   <Link className="dashboard-brand" href="/" aria-label="Uptime App — главная">UPTIME APP</Link>
+   <AuthNav />
+  </header>}
+  <main className={user ? "dashboard-content" : undefined} aria-label="Содержимое дэшборда">
+   {!user && <AuthNav />}
+  </main>
+ </div>;
 }

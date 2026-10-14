@@ -21,6 +21,7 @@ Use Node.js 20.9+ and npm. Run these commands from `frontend/`:
 - `npm run typecheck`: check TypeScript without emitting files.
 - `npm run build`: create the production build using webpack.
 - `npm start`: serve the frontend after building.
+- `npm run test:auth-browser`: check authentication in Chromium against local API, Next.js and Mailpit; install the browser with `npx playwright install chromium` or set `BROWSER_EXECUTABLE`.
 
 From the application root, `make frontend-dev` starts development.
 
@@ -32,7 +33,7 @@ Follow the Next.js ESLint configuration; no separate formatter is configured. Ke
 
 ## Validation & Configuration
 
-No frontend test runner or coverage threshold is configured. Run lint, typecheck, and a production build for relevant changes. For API integration changes, start the backend and manually verify the API status button.
+The authentication browser check uses Playwright; no unit test runner or coverage threshold is configured. Run lint, typecheck, and a production build for relevant changes. For API integration changes, start the backend and verify the API status button (also covered by `npm run test:auth-browser`).
 
 Next.js reads `.env.local`. `API_URL` defaults to `http://127.0.0.1:8080` and controls proxying of `/api/*`; browser requests should use relative API paths. Set the same server-only `PROXY_SECRET` as the API to authenticate the socket-derived client IP. Never trust browser-supplied forwarded headers. Restart development after changing these settings and rebuild for production. Keep secrets out of browser-exposed variables and update `.env.example` when settings change.
 

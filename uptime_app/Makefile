@@ -1,4 +1,14 @@
-.PHONY: setup backend-dev frontend-dev build check infra-up infra-down migrate-up migrate-status migrate-down test-integration
+.PHONY: setup dev stop backend-dev frontend-dev build check infra-up infra-down migrate-up migrate-status migrate-down test-integration test-auth-browser
+.DEFAULT_GOAL := setup
+
+dev:
+	node scripts/dev.mjs
+
+stop:
+	node scripts/stop.mjs
+
+test-auth-browser:
+	cd frontend && npm run test:auth-browser
 
 setup:
 	./scripts/setup.sh

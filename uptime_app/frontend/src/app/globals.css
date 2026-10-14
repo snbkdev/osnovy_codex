@@ -18,3 +18,29 @@ input { width: 100%; padding: 12px; border: 1px solid #aab4c6; border-radius: 6p
 .field-hint { margin-top: -12px; color: #526078; font-size: 14px; font-weight: 400; }
 [role="alert"] { color: #a21d28; }
 @media (max-width: 600px) { main { margin: 5vh auto; padding: 20px; } }
+
+.dashboard { min-height: 100vh; }
+.dashboard-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px max(24px, calc((100vw - 1200px) / 2)); background: white; border-bottom: 1px solid #dde3ec; }
+.dashboard-brand { font-weight: 700; letter-spacing: .12em; text-decoration: none; white-space: nowrap; }
+.dashboard-content { max-width: 1200px; margin: 40px auto; }
+.dashboard-account { position: relative; min-width: 0; max-width: 100%; margin-left: auto; }
+.dashboard-account-controls { display: flex; align-items: center; gap: 16px; }
+.dashboard-logout { flex-shrink: 0; }
+.dashboard-profile { min-width: 0; }
+.dashboard-profile summary { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; cursor: pointer; list-style: none; }
+.dashboard-profile summary::-webkit-details-marker { display: none; }
+.dashboard-profile summary:hover, .dashboard-profile[open] summary { background: #f4f6fa; }
+.dashboard-profile summary:focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+.dashboard-avatar { display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; color: #4338ca; background: #eeedff; font-weight: 700; }
+.dashboard-profile-label { display: grid; gap: 4px; min-width: 0; font-weight: 600; }
+.dashboard-profile-label span { max-width: 260px; overflow: hidden; text-overflow: ellipsis; color: #526078; font-size: 13px; font-weight: 400; }
+.dashboard-profile-panel { position: absolute; top: calc(100% + 12px); right: 0; z-index: 10; width: min(320px, calc(100vw - 40px)); padding: 24px; background: white; border: 1px solid #dde3ec; border-radius: 12px; box-shadow: 0 12px 32px #18223514; }
+.dashboard-profile-panel h2 { margin: 0 0 12px; font-size: 18px; }
+.dashboard-profile-email { overflow-wrap: anywhere; margin-bottom: 4px; }
+.dashboard-profile-status { margin-top: 4px; color: #526078; font-size: 14px; }
+@media (max-width: 600px) {
+  .dashboard-header { padding: 12px 20px; gap: 12px; flex-wrap: wrap; }
+  .dashboard-account-controls { gap: 8px; }
+  .dashboard-profile-label span { max-width: 120px; }
+  .dashboard-content { margin-top: 20px; }
+}

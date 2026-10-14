@@ -16,9 +16,12 @@ This guide applies to both applications. Each directory guide adds instructions 
 The full project requires Go 1.25+, Node.js 20.9+, and npm.
 
 - `make setup`: create missing local environment files and install frontend dependencies.
+- `make dev`: start both applications, load `backend/.env`, and stop both on Ctrl+C or process failure.
+- `make stop`: stop this checkout's active `make dev` from another terminal; repeated stops are safe.
 - `make backend-dev` and `make frontend-dev`: start the applications in separate terminals.
 - `make check`: run Go tests, go vet, ESLint, and TypeScript checks.
 - `make build`: build both applications for production.
+- `make test-auth-browser`: run Playwright against local applications and Mailpit; use a separate API test database and a fresh API process to avoid mail rate limits.
 
 Use tabs for Makefile recipes. Keep setup scripts repeatable and preserve existing local configuration.
 

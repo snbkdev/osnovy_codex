@@ -24,13 +24,25 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const needsPassword = mode === "register" || mode === "login" || mode === "reset-password";
   useEffect(() => {
     if (!needsToken) return;
-    const value = new URLSearchParams(window.location.hash.slice(1)).get("token") || "";
-    window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
-    // Preserve the first read when React Strict Mode runs the effect twice.
-    // The token comes from browser-only URL state after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setToken((current) => current ?? value);
-  }, [needsToken]);
+    function readToken() {
+      const fragment = window.location.hash;
+      if (!fragment) {
+        // Preserve the first read when Strict Mode repeats the initial effect.
+        setToken((current) => current ?? "");
+        return;
+      }
+      const value = new URLSearchParams(fragment.slice(1)).get("token") || "";
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+      setToken(value);
+      setMessage("");
+      setError("");
+      setPassword("");
+    }
+    // Tokens also arrive by opening another email link on the same page.
+    readToken();
+    window.addEventListener("hashchange", readToken);
+    return () => window.removeEventListener("hashchange", readToken);
+  }, [needsToken, mode]);
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError(""); setUnverified(false);
     try {
