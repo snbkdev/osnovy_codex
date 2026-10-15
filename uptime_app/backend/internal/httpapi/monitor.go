@@ -2,18 +2,15 @@ package httpapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 
-	"uptime_app/backend/internal/auth"
 	"uptime_app/backend/internal/monitor"
 )
 
 type monitorService interface {
 	Create(context.Context, string, string, int) (monitor.Monitor, error)
-	List(context.Context, string) ([]monitor.Monitor, error)
+	List(context.Context, string, ...string) ([]monitor.Monitor, error)
 }
 
 func createMonitorHandler(service monitorService) http.HandlerFunc {
@@ -22,20 +19,21 @@ func createMonitorHandler(service monitorService) http.HandlerFunc {
 			URL             string `json:"url"`
 			IntervalSeconds int    `json:"interval_seconds"`
 		}
-		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
-		decoder.DisallowUnknownFields()
-		if err := decoder.Decode(&input); err != nil {
-			apiError(w, 400, "invalid_input", "Укажите URL и целый интервал в секундах.")
+		if !jsonInput(w, r, 4096, &input, "Укажите URL и целый интервал в секундах.") {
 			return
 		}
-		if decoder.Decode(new(any)) != io.EOF {
-			apiError(w, 400, "invalid_input", "Ожидается один JSON-объект.")
-			return
-		}
-		user := r.Context().Value(userContextKey{}).(auth.User)
+		user := currentIdentity(r).User
 		value, err := service.Create(r.Context(), user.ID, input.URL, input.IntervalSeconds)
+		if errors.Is(err, monitor.ErrQuota) {
+			apiError(w, 409, "monitor_quota", "Достигнут лимит в 100 мониторов.")
+			return
+		}
 		if errors.Is(err, monitor.ErrInvalid) {
 			apiError(w, 400, "invalid_input", "Укажите корректный HTTP/HTTPS URL без логина и пароля и интервал от 5 секунд до 7 дней.")
+			return
+		}
+		if errors.Is(err, monitor.ErrUnauthorized) {
+			apiError(w, 401, "unauthorized", "Войдите в аккаунт.")
 			return
 		}
 		if err != nil {
@@ -48,8 +46,16 @@ func createMonitorHandler(service monitorService) http.HandlerFunc {
 
 func listMonitorsHandler(service monitorService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value(userContextKey{}).(auth.User)
-		values, err := service.List(r.Context(), user.ID)
+		user := currentIdentity(r).User
+		values, err := service.List(r.Context(), user.ID, r.URL.Query().Get("before"))
+		if errors.Is(err, monitor.ErrInvalid) {
+			apiError(w, 400, "invalid_input", "Некорректный курсор.")
+			return
+		}
+		if errors.Is(err, monitor.ErrUnauthorized) {
+			apiError(w, 401, "unauthorized", "Войдите в аккаунт.")
+			return
+		}
 		if err != nil {
 			serviceError(w, err)
 			return

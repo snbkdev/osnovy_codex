@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"net/http"
-	"uptime_app/backend/internal/auth"
 	"uptime_app/backend/internal/config"
 )
 
@@ -17,6 +16,9 @@ func newRouter(service authService, cfg config.Config) http.Handler {
 }
 
 func NewApplicationRouter(service authService, monitors monitorService, cfg config.Config) http.Handler {
+	return NewLimitedApplicationRouter(service, monitors, cfg, nil)
+}
+func NewLimitedApplicationRouter(service authService, monitors monitorService, cfg config.Config, limits RateLimiter) http.Handler {
 	mux := http.NewServeMux()
 	if cfg.AvatarDir == "" {
 		cfg.AvatarDir = "uploads/avatars"
@@ -32,12 +34,12 @@ func NewApplicationRouter(service authService, monitors monitorService, cfg conf
 			mux.Handle("GET /api/v1/monitors", requireAuth(service, listMonitorsHandler(monitors)))
 		}
 		if avatars, ok := service.(avatarService); ok {
-			mux.Handle("POST /api/v1/auth/avatar", requireAuth(service, avatarHandler(avatars, cfg.AvatarDir)))
+			mux.Handle("POST /api/v1/auth/avatar", requireAuth(service, limitAvatar(limits, avatarHandler(avatars))))
 		}
-		mux.Handle("/api/v1/auth/", &authHandler{service: service, config: cfg})
+		mux.Handle("/api/v1/auth/", &authHandler{service: service, config: cfg, shared: limits})
 		mux.Handle("POST /api/v1/auth/profile", requireAuth(service, http.HandlerFunc(profileHandler(service))))
 		mux.Handle("GET /api/v1/auth/me", requireAuth(service, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := r.Context().Value(userContextKey{}).(auth.User)
+			user := currentIdentity(r).User
 			jsonResponse(w, 200, dto(user))
 		})))
 	}

@@ -273,7 +273,7 @@ func TestPostgresConcurrentTokens(t *testing.T) {
 	wg.Wait()
 	close(registrationErrors)
 	for err := range registrationErrors {
-		if err != nil {
+		if err != nil && !errors.Is(err, auth.ErrBusy) {
 			t.Fatal(err)
 		}
 	}
@@ -396,7 +396,7 @@ func TestPostgresMigrations(t *testing.T) {
 		t.Fatalf("repeat up: %+v %v", group, err)
 	}
 	list, err := m.MigrationsWithStatus(ctx)
-	if err != nil || len(list) != 4 {
+	if err != nil || len(list) != 6 {
 		t.Fatal("invalid status", err)
 	}
 	for _, migration := range list {
@@ -457,7 +457,7 @@ func TestPostgresMailDelivery(t *testing.T) {
 				t.Fatal("retry ignored delay")
 			}
 			now = row.AvailableAt.Add(time.Second)
-		} else if len(row.Payload) != 0 || row.FinishedAt == nil {
+		} else if len(row.Payload) != 0 || row.FinishedAt == nil || row.Status != "failed" || row.ErrorCode == nil || *row.ErrorCode != "smtp_error" {
 			t.Fatal("payload retained after terminal failure")
 		}
 	}
@@ -470,7 +470,7 @@ func TestPostgresMailDelivery(t *testing.T) {
 		t.Fatal("successful send failed", err)
 	}
 	var count int
-	db.NewRaw("SELECT count(*) FROM mail_queue WHERE payload IS NOT NULL").Scan(ctx, &count)
+	db.NewRaw("SELECT count(*) FROM mail_queue WHERE payload IS NOT NULL OR status NOT IN ('failed','delivered')").Scan(ctx, &count)
 	if count != 0 {
 		t.Fatal("sent payload retained")
 	}

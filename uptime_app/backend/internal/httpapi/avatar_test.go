@@ -22,7 +22,7 @@ type avatarStub struct {
 	uploads   int
 }
 
-func (s *avatarStub) SaveAvatar(_ context.Context, _ string, _ string, input io.Reader) (auth.User, error) {
+func (s *avatarStub) SaveAvatar(_ context.Context, _ auth.Identity, input io.Reader) (auth.User, error) {
 	s.uploads++
 	io.Copy(io.Discard, input)
 	return auth.User{ID: "user", AvatarURL: "/api/v1/avatars/" + strings.Repeat("a", 32) + ".png"}, s.uploadErr
@@ -78,5 +78,22 @@ func TestAvatarHTTP(t *testing.T) {
 		if tc.status == 200 && (w.Header().Get("Content-Type") != "image/png" || w.Header().Get("X-Content-Type-Options") != "nosniff") {
 			t.Fatal(w.Header())
 		}
+	}
+}
+
+func TestAvatarUploadBudget(t *testing.T) {
+	calls := 0
+	handler := limitAvatar(nil, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++; w.WriteHeader(204) }))
+	for i := 0; i < 11; i++ {
+		req := httptest.NewRequest("POST", "/", nil)
+		req = req.WithContext(context.WithValue(req.Context(), identityContextKey{}, auth.Identity{User: auth.User{ID: "owner"}, SessionID: "session"}))
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if i < 10 && w.Code != 204 || i == 10 && w.Code != 429 {
+			t.Fatal(i, w.Code)
+		}
+	}
+	if calls != 10 {
+		t.Fatal("rate limited upload reached decoder", calls)
 	}
 }

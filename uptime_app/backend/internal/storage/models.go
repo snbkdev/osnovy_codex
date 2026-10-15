@@ -20,10 +20,12 @@ type sessionRow struct {
 	CreatedAt time.Time
 }
 type refreshRow struct {
-	Hash      string
-	SessionID string
-	UsedAt    *time.Time
-	CreatedAt time.Time
+	RequestHash *string
+	NextHash    *string
+	Hash        string
+	SessionID   string
+	UsedAt      *time.Time
+	CreatedAt   time.Time
 }
 type tokenRow struct {
 	Hash      string
@@ -32,6 +34,8 @@ type tokenRow struct {
 	ExpiresAt time.Time
 }
 type mailRow struct {
+	Status      string
+	ErrorCode   *string
 	ID          int64
 	Payload     []byte
 	Attempts    int

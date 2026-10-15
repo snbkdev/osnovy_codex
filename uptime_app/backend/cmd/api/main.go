@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"uptime_app/backend/internal/auth"
+	"uptime_app/backend/internal/avatar"
 	"uptime_app/backend/internal/config"
 	"uptime_app/backend/internal/httpapi"
 	"uptime_app/backend/internal/mail"
@@ -45,14 +46,17 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	service.Avatars = avatar.LocalStore{Dir: cfg.AvatarDir}
 	worker := &storage.MailWorker{DB: db, Cipher: cipher, Sender: mail.SMTP{Addr: cfg.SMTPAddr, User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.MailFrom, AllowInsecure: cfg.SMTPInsecure}}
 	workerCtx, workerCancel := context.WithCancel(ctx)
 	workerDone := make(chan struct{})
 	go func() { defer close(workerDone); worker.Run(workerCtx) }()
-	defer func() { workerCancel(); <-workerDone }()
+	maintenanceDone := make(chan struct{})
+	go func() { defer close(maintenanceDone); storage.RunMaintenance(workerCtx, db, cfg.AvatarDir) }()
+	defer func() { workerCancel(); <-workerDone; <-maintenanceDone }()
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewApplicationRouter(service, &monitor.Service{Repo: &storage.MonitorRepository{DB: db}}, cfg),
+		Handler:           httpapi.NewLimitedApplicationRouter(service, &monitor.Service{Repo: &storage.MonitorRepository{DB: db}}, cfg, &storage.RateLimiter{DB: db}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

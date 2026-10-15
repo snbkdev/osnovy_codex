@@ -23,15 +23,14 @@ func validateProfile(name string, birthday *string, now time.Time) (string, *tim
 	return name, &date, nil
 }
 
-func (s *Service) UpdateProfile(ctx context.Context, bearer, name string, birthday *string) (User, error) {
+func (s *Service) UpdateProfile(ctx context.Context, identity Identity, name string, birthday *string) (User, error) {
 	now := time.Now()
-	claims, err := s.Signer.Parse(bearer, now)
-	if err != nil {
-		return User{}, err
+	if !identity.Valid() {
+		return User{}, ErrUnauthorized
 	}
 	name, date, err := validateProfile(name, birthday, now)
 	if err != nil {
 		return User{}, err
 	}
-	return s.Repo.UpdateProfile(ctx, claims.Subject, claims.SessionID, name, date, now)
+	return s.Repo.UpdateProfile(ctx, identity.User.ID, identity.SessionID, name, date, now)
 }

@@ -18,7 +18,7 @@ type stubService struct {
 	calls int
 }
 
-func (s *stubService) UpdateProfile(_ context.Context, _ string, name string, _ *string) (auth.User, error) {
+func (s *stubService) UpdateProfile(_ context.Context, _ auth.Identity, name string, _ *string) (auth.User, error) {
 	s.calls++
 	return auth.User{ID: "id", Email: "a@example.com", FullName: name, EmailVerified: true}, s.err
 }
@@ -29,7 +29,7 @@ func (s *stubService) Verify(context.Context, string) error            { return 
 func (s *stubService) Login(context.Context, string, string) (auth.LoginResult, error) {
 	return auth.LoginResult{AccessToken: "access", RefreshToken: "refresh", User: auth.User{ID: "id", Email: "a@example.com", PasswordHash: "secret", EmailVerified: true}}, s.err
 }
-func (s *stubService) Refresh(context.Context, string) (auth.LoginResult, error) {
+func (s *stubService) Refresh(context.Context, string, ...string) (auth.LoginResult, error) {
 	return s.Login(context.Background(), "", "")
 }
 func (s *stubService) Logout(context.Context, string) error        { return s.err }
@@ -172,4 +172,41 @@ func TestTrustedProxyIP(t *testing.T) {
 	if h.clientIP(r) != "10.0.0.1" {
 		t.Fatal("untrusted source accepted")
 	}
+}
+
+func TestLoginAndResetRequestBudgets(t *testing.T) {
+	for _, action := range []string{"login", "reset-password"} {
+		h := &authHandler{}
+		for i := 0; i < 10; i++ {
+			req := httptest.NewRequest("POST", "/api/v1/auth/"+action, nil)
+			req.RemoteAddr = "192.0.2.1:1234"
+			if !h.limit(httptest.NewRecorder(), req, action, strings.Repeat("a", i)+"@example.com") {
+				t.Fatal("early rejection", action, i)
+			}
+		}
+		req := httptest.NewRequest("POST", "/api/v1/auth/"+action, nil)
+		req.RemoteAddr = "192.0.2.1:1234"
+		w := httptest.NewRecorder()
+		if h.limit(w, req, action, "another@example.com") || w.Code != 429 || w.Header().Get("Retry-After") == "" {
+			t.Fatal("IP budget bypass", action, w.Code)
+		}
+	}
+	h := &authHandler{}
+	for i := 0; i < 10; i++ {
+		req := httptest.NewRequest("POST", "/", nil)
+		req.RemoteAddr = "192.0.2.1:1234"
+		if !h.limit(httptest.NewRecorder(), req, "login", "same@example.com") {
+			t.Fatal("early rejection")
+		}
+	}
+	req := httptest.NewRequest("POST", "/", nil)
+	req.RemoteAddr = "192.0.2.2:1234"
+	if h.limit(httptest.NewRecorder(), req, "login", "same@example.com") {
+		t.Fatal("account budget bypass")
+	}
+}
+
+func (s *stubService) Authenticate(ctx context.Context, bearer string) (auth.Identity, error) {
+	user, err := s.Me(ctx, bearer)
+	return auth.Identity{User: user, SessionID: "session"}, err
 }

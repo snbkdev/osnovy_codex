@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -24,7 +23,7 @@ func (s *monitorRepositoryStub) Create(_ context.Context, value monitor.Monitor)
 	s.values = append(s.values, value)
 	return value, s.err
 }
-func (s *monitorRepositoryStub) List(_ context.Context, owner string) ([]monitor.Monitor, error) {
+func (s *monitorRepositoryStub) List(_ context.Context, owner string, cursor ...string) ([]monitor.Monitor, error) {
 	s.owner = owner
 	return s.values, s.err
 }
@@ -86,6 +85,10 @@ func TestMonitorHTTP(t *testing.T) {
 		if w := request(method, `{"url":"https://example.com","interval_seconds":5}`, true); w.Code != 503 {
 			t.Fatal("missing storage error", w.Code)
 		}
+	}
+	repo.err = monitor.ErrQuota
+	if w := request("POST", `{"url":"https://example.com","interval_seconds":5}`, true); w.Code != 409 {
+		t.Fatal("quota error not mapped", w.Code)
 	}
 	repo.err = nil
 	users.err = auth.ErrUnauthorized

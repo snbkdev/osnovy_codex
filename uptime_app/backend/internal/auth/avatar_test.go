@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uptime_app/backend/internal/avatar"
 )
 
 type avatarRepo struct {
@@ -28,16 +29,13 @@ func (r *avatarRepo) UpdateAvatar(_ context.Context, uid, sid, url string, _ tim
 	return User{ID: uid, AvatarURL: url}, r.err
 }
 func TestSaveAvatar(t *testing.T) {
-	signer := Signer{Key: bytes.Repeat([]byte{1}, 32), Issuer: "test", Audience: "web"}
-	token, err := signer.Issue("user", "session", time.Now())
-	if err != nil {
-		t.Fatal(err)
-	}
+	identity := Identity{User: User{ID: "user"}, SessionID: "session"}
+	var err error
 	for _, format := range []string{"jpeg", "png"} {
 		t.Run(format, func(t *testing.T) {
 			repo := &avatarRepo{}
-			service := &Service{Repo: repo, Signer: signer}
 			dir := t.TempDir()
+			service := &Service{Repo: repo, Avatars: avatar.LocalStore{Dir: dir}}
 			var input bytes.Buffer
 			img := image.NewRGBA(image.Rect(0, 0, 80, 40))
 			if format == "jpeg" {
@@ -48,7 +46,7 @@ func TestSaveAvatar(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			user, err := service.SaveAvatar(context.Background(), token, dir, bytes.NewReader(input.Bytes()))
+			user, err := service.SaveAvatar(context.Background(), identity, bytes.NewReader(input.Bytes()))
 			if err != nil || repo.calls != 1 || !strings.HasPrefix(user.AvatarURL, "/api/v1/avatars/") {
 				t.Fatal(user, err)
 			}
@@ -61,7 +59,7 @@ func TestSaveAvatar(t *testing.T) {
 				t.Fatal(cfg, kind, err)
 			}
 			repo.err = ErrUnauthorized
-			_, err = service.SaveAvatar(context.Background(), token, dir, bytes.NewReader(input.Bytes()))
+			_, err = service.SaveAvatar(context.Background(), identity, bytes.NewReader(input.Bytes()))
 			entries, _ := os.ReadDir(dir)
 			if !errors.Is(err, ErrUnauthorized) || len(entries) != 1 {
 				t.Fatal("failed upload leaked file", err, len(entries))
@@ -69,19 +67,19 @@ func TestSaveAvatar(t *testing.T) {
 		})
 	}
 	repo := &avatarRepo{}
-	service := &Service{Repo: repo, Signer: signer}
 	dir := t.TempDir()
+	service := &Service{Repo: repo, Avatars: avatar.LocalStore{Dir: dir}}
 	var large bytes.Buffer
 	png.Encode(&large, image.NewRGBA(image.Rect(0, 0, 4097, 1)))
 	var valid bytes.Buffer
 	png.Encode(&valid, image.NewRGBA(image.Rect(0, 0, 8, 8)))
 	for _, input := range [][]byte{[]byte("<svg/>"), bytes.Repeat([]byte{0}, MaxAvatarBytes+1), large.Bytes(), valid.Bytes()[:len(valid.Bytes())/2]} {
-		_, err := service.SaveAvatar(context.Background(), token, dir, bytes.NewReader(input))
+		_, err := service.SaveAvatar(context.Background(), identity, bytes.NewReader(input))
 		if !errors.Is(err, ErrInvalid) {
 			t.Fatal("invalid image accepted", err)
 		}
 	}
-	_, err = service.SaveAvatar(context.Background(), "invalid", dir, bytes.NewReader(valid.Bytes()))
+	_, err = service.SaveAvatar(context.Background(), Identity{}, bytes.NewReader(valid.Bytes()))
 	if !errors.Is(err, ErrUnauthorized) || repo.calls != 0 {
 		t.Fatal("invalid upload reached repository", err)
 	}

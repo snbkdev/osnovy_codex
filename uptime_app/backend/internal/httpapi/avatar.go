@@ -2,20 +2,22 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"path/filepath"
-	"regexp"
-	"strings"
+	"strconv"
+	"time"
+	"uptime_app/backend/internal/avatar"
 
 	"uptime_app/backend/internal/auth"
 )
 
 type avatarService interface {
-	SaveAvatar(context.Context, string, string, io.Reader) (auth.User, error)
+	SaveAvatar(context.Context, auth.Identity, io.Reader) (auth.User, error)
 }
 
-func avatarHandler(service avatarService, dir string) http.HandlerFunc {
+func avatarHandler(service avatarService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, auth.MaxAvatarBytes+64*1024)
 		if err := r.ParseMultipartForm(auth.MaxAvatarBytes + 64*1024); err != nil {
@@ -29,9 +31,9 @@ func avatarHandler(service avatarService, dir string) http.HandlerFunc {
 			return
 		}
 		defer file.Close()
-		user, err := service.SaveAvatar(r.Context(), strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), dir, file)
+		user, err := service.SaveAvatar(r.Context(), currentIdentity(r), file)
 		if err != nil {
-			if err == auth.ErrInvalid {
+			if errors.Is(err, auth.ErrInvalid) {
 				apiError(w, 400, "invalid_input", "Выберите корректный JPEG или PNG до 5 МБ и 4096×4096 пикселей.")
 			} else {
 				serviceError(w, err)
@@ -42,12 +44,10 @@ func avatarHandler(service avatarService, dir string) http.HandlerFunc {
 	}
 }
 
-var avatarFilename = regexp.MustCompile(`^[a-f0-9]{32}\.png$`)
-
 func serveAvatar(dir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("filename")
-		if !avatarFilename.MatchString(name) {
+		if !avatar.Filename.MatchString(name) {
 			http.NotFound(w, r)
 			return
 		}
@@ -56,4 +56,30 @@ func serveAvatar(dir string) http.HandlerFunc {
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		http.ServeFile(w, r, filepath.Join(dir, name))
 	}
+}
+
+func limitAvatar(shared RateLimiter, next http.Handler) http.Handler {
+	local := &limiter{}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := currentIdentity(r).User
+		keys := []string{"avatar:user:" + user.ID}
+		var ok bool
+		var retry int
+		if shared != nil {
+			var err error
+			ok, retry, err = shared.Allow(r.Context(), keys, 10, time.Hour)
+			if err != nil {
+				serviceError(w, err)
+				return
+			}
+		} else {
+			ok, retry = local.allow(keys, 10, time.Hour, time.Now())
+		}
+		if !ok {
+			w.Header().Set("Retry-After", strconv.Itoa(retry))
+			apiError(w, 429, "rate_limited", "Слишком много загрузок. Попробуйте позже.")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

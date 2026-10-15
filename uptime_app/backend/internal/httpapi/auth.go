@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -23,11 +22,11 @@ type authService interface {
 	SendToken(context.Context, string, string) error
 	Verify(context.Context, string) error
 	Login(context.Context, string, string) (auth.LoginResult, error)
-	Refresh(context.Context, string) (auth.LoginResult, error)
+	Refresh(context.Context, string, ...string) (auth.LoginResult, error)
 	Logout(context.Context, string) error
 	Reset(context.Context, string, string) error
-	Me(context.Context, string) (auth.User, error)
-	UpdateProfile(context.Context, string, string, *string) (auth.User, error)
+	Authenticate(context.Context, string) (auth.Identity, error)
+	UpdateProfile(context.Context, auth.Identity, string, *string) (auth.User, error)
 }
 
 type userDTO struct {
@@ -105,18 +104,16 @@ type authHandler struct {
 	service authService
 	config  config.Config
 	limits  limiter
+	shared  RateLimiter
 }
 
-func jsonResponse(w http.ResponseWriter, status int, data any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
 func apiError(w http.ResponseWriter, status int, code, message string) {
 	jsonResponse(w, status, map[string]any{"error": map[string]string{"code": code, "message": message}})
 }
 func serviceError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, auth.ErrBusy):
+		apiError(w, 429, "resource_busy", "Сервис занят. Попробуйте позже.")
 	case errors.Is(err, auth.ErrInvalid):
 		apiError(w, 400, "invalid_input", "Проверьте данные. Ссылка могла истечь или уже использована.")
 	case errors.Is(err, auth.ErrCredentials):
@@ -131,15 +128,7 @@ func serviceError(w http.ResponseWriter, err error) {
 }
 func decode(w http.ResponseWriter, r *http.Request) (authInput, bool) {
 	var input authInput
-	r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil {
-		apiError(w, 400, "invalid_input", "Невалидный JSON или превышен размер запроса.")
-		return input, false
-	}
-	if decoder.Decode(new(any)) != io.EOF {
-		apiError(w, 400, "invalid_input", "Ожидается один JSON-объект.")
+	if !jsonInput(w, r, 16*1024, &input, "Невалидный JSON или превышен размер запроса.") {
 		return input, false
 	}
 	return input, true
@@ -170,7 +159,11 @@ func (h *authHandler) limit(w http.ResponseWriter, r *http.Request, action, emai
 	case "login":
 		max = 10
 		window = 15 * time.Minute
-		keys = []string{"login:" + ip + ":" + email}
+		keys = []string{"login:ip:" + ip, "login:email:" + email}
+	case "reset-password":
+		keys = []string{"reset:ip:" + ip}
+		max = 10
+		window = 15 * time.Minute
 	case "refresh":
 		max = 60
 		window = time.Minute
@@ -178,7 +171,19 @@ func (h *authHandler) limit(w http.ResponseWriter, r *http.Request, action, emai
 	default:
 		keys = []string{"mail:ip:" + ip, "mail:email:" + email}
 	}
-	if ok, retry := h.limits.allow(keys, max, window, time.Now()); !ok {
+	var ok bool
+	var retry int
+	if h.shared != nil {
+		var err error
+		ok, retry, err = h.shared.Allow(r.Context(), keys, max, window)
+		if err != nil {
+			serviceError(w, err)
+			return false
+		}
+	} else {
+		ok, retry = h.limits.allow(keys, max, window, time.Now())
+	}
+	if !ok {
 		w.Header().Set("Retry-After", strconv.Itoa(retry))
 		apiError(w, 429, "rate_limited", "Слишком много запросов. Попробуйте позже.")
 		return false
@@ -231,7 +236,7 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if !h.limit(w, r, action, "") {
 			return
 		}
-		result, err := h.service.Refresh(r.Context(), refreshCookie(r))
+		result, err := h.service.Refresh(r.Context(), refreshCookie(r), r.Header.Get("X-Uptime-Refresh-Request"))
 		if err != nil {
 			if errors.Is(err, auth.ErrUnauthorized) {
 				h.cookie(w, "", true)
@@ -260,7 +265,7 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(input.Email))
-	if action == "register" || action == "login" || action == "resend-verification" || action == "forgot-password" {
+	if action == "register" || action == "login" || action == "resend-verification" || action == "forgot-password" || action == "reset-password" {
 		if !h.limit(w, r, action, email) {
 			return
 		}
@@ -295,4 +300,8 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	jsonResponse(w, 200, map[string]string{"message": "Готово. Теперь можно войти."})
+}
+
+type RateLimiter interface {
+	Allow(context.Context, []string, int, time.Duration) (bool, int, error)
 }

@@ -3,25 +3,24 @@ package auth
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
+	"errors"
 	"image"
 	_ "image/jpeg"
-	"image/png"
+	_ "image/png"
 	"io"
-	"os"
-	"path/filepath"
 	"time"
 )
 
 const MaxAvatarBytes = 5 * 1024 * 1024
 
 // SaveAvatar validates and re-encodes uploads so only actual PNG image data is served.
-func (s *Service) SaveAvatar(ctx context.Context, bearer, dir string, input io.Reader) (User, error) {
+func (s *Service) SaveAvatar(ctx context.Context, identity Identity, input io.Reader) (User, error) {
 	now := time.Now()
-	claims, err := s.Signer.Parse(bearer, now)
-	if err != nil {
-		return User{}, err
+	if !identity.Valid() {
+		return User{}, ErrUnauthorized
+	}
+	if s.Avatars == nil {
+		return User{}, errors.New("avatar store unavailable")
 	}
 	data, err := io.ReadAll(io.LimitReader(input, MaxAvatarBytes+1))
 	if err != nil {
@@ -47,31 +46,16 @@ func (s *Service) SaveAvatar(ctx context.Context, bearer, dir string, input io.R
 			dst.Set(x, y, src.At(x0+x*side/256, y0+y*side/256))
 		}
 	}
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return User{}, err
-	}
-	var id [16]byte
-	if _, err := rand.Read(id[:]); err != nil {
-		return User{}, err
-	}
-	filename := hex.EncodeToString(id[:]) + ".png"
-	path := filepath.Join(dir, filename)
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	url, err := s.Avatars.Save(ctx, dst)
 	if err != nil {
 		return User{}, err
 	}
-	encodeErr := png.Encode(f, dst)
-	closeErr := f.Close()
-	if encodeErr != nil || closeErr != nil {
-		os.Remove(path)
-		if encodeErr != nil {
-			return User{}, encodeErr
-		}
-		return User{}, closeErr
-	}
-	user, err := s.Repo.UpdateAvatar(ctx, claims.Subject, claims.SessionID, "/api/v1/avatars/"+filename, now)
+	user, err := s.Repo.UpdateAvatar(ctx, identity.User.ID, identity.SessionID, url, now)
 	if err != nil {
-		os.Remove(path)
+		// The request may have been cancelled; cleanup must still run.
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		err = errors.Join(err, s.Avatars.Delete(cleanupCtx, url))
 	}
 	return user, err
 }

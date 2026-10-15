@@ -5,8 +5,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-
-	"uptime_app/backend/internal/auth"
 )
 
 type stubRepository struct {
@@ -19,7 +17,7 @@ func (r *stubRepository) Create(_ context.Context, value Monitor) (Monitor, erro
 	r.created = append(r.created, value)
 	return value, r.err
 }
-func (r *stubRepository) List(_ context.Context, userID string) ([]Monitor, error) {
+func (r *stubRepository) List(_ context.Context, userID string, cursor ...string) ([]Monitor, error) {
 	r.listedUser = userID
 	return r.created, r.err
 }
@@ -41,7 +39,7 @@ func TestCreateMonitor(t *testing.T) {
 	if len(repo.created) != 6 {
 		t.Fatal("invalid input reached repository")
 	}
-	if _, err := service.Create(context.Background(), "", "https://example.com", 60); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := service.Create(context.Background(), "", "https://example.com", 60); !errors.Is(err, ErrUnauthorized) {
 		t.Fatal(err)
 	}
 	repo.err = errors.New("database unavailable")
@@ -75,7 +73,7 @@ func TestListMonitors(t *testing.T) {
 	if _, err := service.List(context.Background(), "owner"); err != nil || repo.listedUser != "owner" {
 		t.Fatal("wrong owner", err)
 	}
-	if _, err := service.List(context.Background(), ""); !errors.Is(err, auth.ErrUnauthorized) {
+	if _, err := service.List(context.Background(), ""); !errors.Is(err, ErrUnauthorized) {
 		t.Fatal(err)
 	}
 	repo.err = errors.New("database unavailable")

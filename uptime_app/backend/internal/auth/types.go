@@ -7,6 +7,7 @@ import (
 )
 
 var (
+	ErrBusy         = errors.New("resource_busy")
 	ErrInvalid      = errors.New("invalid_input")
 	ErrCredentials  = errors.New("invalid_credentials")
 	ErrUnverified   = errors.New("email_not_verified")
@@ -20,6 +21,16 @@ type User struct {
 	AvatarURL               string
 	DateOfBirth             *time.Time
 }
+
+const RefreshRetryWindow = 30 * time.Second
+
+type Identity struct {
+	User      User
+	SessionID string
+}
+
+func (i Identity) Valid() bool { return i.User.ID != "" && i.SessionID != "" }
+
 type Session struct {
 	ID, UserID string
 	ExpiresAt  time.Time
@@ -38,7 +49,7 @@ type Repository interface {
 	Verify(context.Context, string, time.Time) error
 	FindUser(context.Context, string) (User, error)
 	CreateSession(context.Context, User, Session, string, time.Time) error
-	Rotate(context.Context, string, string, time.Time) (User, Session, error)
+	Rotate(context.Context, string, string, time.Time, ...string) (User, Session, error)
 	Revoke(context.Context, string, time.Time) error
 	Reset(context.Context, string, string, time.Time) error
 	Current(context.Context, string, string, time.Time) (User, error)

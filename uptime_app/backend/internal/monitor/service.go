@@ -10,11 +10,17 @@ import (
 	"time"
 	"unicode"
 
-	"uptime_app/backend/internal/auth"
+	"uptime_app/backend/internal/identifier"
 )
 
 const MinIntervalSeconds = 5
 const MaxIntervalSeconds = 7 * 24 * 60 * 60
+
+const MaxMonitors = 100
+const PageSize = 20
+
+var ErrUnauthorized = errors.New("monitor_unauthorized")
+var ErrQuota = errors.New("monitor_quota")
 
 var ErrInvalid = errors.New("invalid_monitor")
 
@@ -28,7 +34,7 @@ type Monitor struct {
 
 type Repository interface {
 	Create(context.Context, Monitor) (Monitor, error)
-	List(context.Context, string) ([]Monitor, error)
+	List(context.Context, string, ...string) ([]Monitor, error)
 }
 
 type Service struct{ Repo Repository }
@@ -83,18 +89,21 @@ func normalizeURL(raw string) (string, error) {
 
 func (s *Service) Create(ctx context.Context, userID, rawURL string, interval int) (Monitor, error) {
 	if userID == "" {
-		return Monitor{}, auth.ErrUnauthorized
+		return Monitor{}, ErrUnauthorized
 	}
 	normalized, err := normalizeURL(rawURL)
 	if err != nil || interval < MinIntervalSeconds || interval > MaxIntervalSeconds {
 		return Monitor{}, ErrInvalid
 	}
-	return s.Repo.Create(ctx, Monitor{ID: auth.RandomToken(), UserID: userID, URL: normalized, IntervalSeconds: interval, CreatedAt: time.Now().UTC()})
+	return s.Repo.Create(ctx, Monitor{ID: identifier.New(), UserID: userID, URL: normalized, IntervalSeconds: interval, CreatedAt: time.Now().UTC()})
 }
 
-func (s *Service) List(ctx context.Context, userID string) ([]Monitor, error) {
+func (s *Service) List(ctx context.Context, userID string, cursor ...string) ([]Monitor, error) {
 	if userID == "" {
-		return nil, auth.ErrUnauthorized
+		return nil, ErrUnauthorized
 	}
-	return s.Repo.List(ctx, userID)
+	if len(cursor) > 1 || len(cursor) == 1 && len(cursor[0]) > 128 {
+		return nil, ErrInvalid
+	}
+	return s.Repo.List(ctx, userID, cursor...)
 }

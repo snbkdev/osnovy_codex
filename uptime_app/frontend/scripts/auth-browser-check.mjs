@@ -71,6 +71,10 @@ async function tokenPage(link, button, pass) {
 }
 
 try {
+  const health = await context.request.get(`${base}/api/v1/health`);
+  assert.equal(health.status(), 200);
+  assert.deepEqual(await health.json(), { status: "ok" });
+  console.log("PASS API health through Next.js proxy");
   await fill(page, "register");
   await page.getByRole("button", { name: "Зарегистрироваться", exact: true }).click();
   await visible(page, "Проверьте почту");
@@ -114,7 +118,7 @@ try {
   await page.getByRole("button", { name: "Добавить сайт", exact: true }).click();
   await page.getByLabel("URL сайта", { exact: true }).fill("https://example.com/status");
   await page.getByLabel("Проверять каждые", { exact: true }).fill("5");
-  await page.getByLabel("Единица времени", { exact: true }).selectOption("1");
+  await page.locator("#monitor-unit").selectOption("1");
   const firstMonitorResponse = page.waitForResponse((res) => res.url().endsWith("/api/v1/monitors") && res.request().method() === "POST");
   await page.getByRole("button", { name: "Создать точку", exact: true }).click();
   const firstMonitor = await firstMonitorResponse;
@@ -125,7 +129,7 @@ try {
   await page.getByRole("button", { name: "Добавить сайт", exact: true }).click();
   await page.getByLabel("URL сайта", { exact: true }).fill("https://example.org/");
   await page.getByLabel("Проверять каждые", { exact: true }).fill("7");
-  await page.getByLabel("Единица времени", { exact: true }).selectOption("60");
+  await page.locator("#monitor-unit").selectOption("60");
   const secondMonitorResponse = page.waitForResponse((res) => res.url().endsWith("/api/v1/monitors") && res.request().method() === "POST");
   await page.getByRole("button", { name: "Создать точку", exact: true }).click();
   assert.equal((await (await secondMonitorResponse).json()).interval_seconds, 420);
@@ -217,14 +221,29 @@ try {
   await visible(tab, email);
   await Promise.all([page.reload(), tab.reload()]);
   await Promise.all([visible(page, email), visible(tab, email)]);
-  assert.equal(await page.locator("main").innerText(), "");
+  await visible(page, "Мои сайты");
+  await poll(async () => await page.locator(".monitor-list li").count() === 2);
   assert.equal(await page.getByRole("button", { name: "Проверить API" }).count(), 0);
   assert(await page.getByRole("button", { name: "Выйти", exact: true }).isVisible());
-  console.log("PASS login, cookie flags, memory-only tokens, reload, simultaneous tabs, empty dashboard");
+  console.log("PASS login, cookie flags, memory-only tokens, reload, simultaneous tabs, monitor dashboard");
 
   // Exercise the actual client module with the real browser's cookies and Web Locks.
-  const source = await readFile(new URL("../src/lib/auth.ts", import.meta.url), "utf8");
-  const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const modules = {};
+  for (const name of ["auth-types", "http-client", "session", "profile-api", "auth"]) {
+    const source = await readFile(new URL(`../src/lib/${name}.ts`, import.meta.url), "utf8");
+    modules[`./${name}`] = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  }
+  const compiled = `const sources = ${JSON.stringify(modules)};
+    const cache = {};
+    function load(name) {
+      if (!cache[name]) {
+        const module = { exports: {} }; cache[name] = module;
+        new Function("exports", "require", sources[name])(module.exports, load);
+      }
+      return cache[name].exports;
+    }
+    Object.assign(exports, load("./auth"));`;
+
   for (const target of [page, tab]) {
     await target.evaluate((code) => {
       const exports = {};
@@ -232,6 +251,28 @@ try {
       window.authCheck = exports;
     }, compiled);
   }
+  // Exercise the form and cursor pagination through the actual API proxy.
+  await page.getByRole("button", { name: "Добавить сайт", exact: true }).click();
+  await page.getByLabel("URL сайта", { exact: true }).fill("https://example.com/browser-form");
+  await page.getByRole("button", { name: "Создать точку", exact: true }).click();
+  await visible(page, "Точка мониторинга создана");
+  for (let index = 0; index < 20; index++) {
+    await page.evaluate(async (index) => {
+      await window.authCheck.authRequest("/api/v1/monitors", { url: `https://example.com/page-${index}`, interval_seconds: 60 });
+    }, index);
+  }
+  await page.reload();
+  await poll(async () => await page.locator(".monitor-list li").count() === 20);
+  await page.getByRole("button", { name: "Загрузить ещё", exact: true }).click();
+  await poll(async () => await page.locator(".monitor-list li").count() === 23);
+  assert.equal(await page.getByRole("button", { name: "Загрузить ещё", exact: true }).count(), 0);
+  console.log("PASS monitor creation and cursor pagination through proxy");
+  // Reload replaces the page context; reinstall the test client.
+  await page.evaluate((code) => {
+    const exports = {};
+    new Function("exports", code)(exports);
+    window.authCheck = exports;
+  }, compiled);
   let refreshCount = 0;
   const countRefresh = (req) => { if (req.url().endsWith("/auth/refresh")) refreshCount++; };
   page.on("request", countRefresh);
@@ -258,6 +299,32 @@ try {
   await page.unroute("**/api/v1/auth/me");
   page.off("request", countRefresh);
   console.log("PASS refresh deduplication, cross-tab locks, Bearer header, single retry");
+  let attempts = 0;
+  let retryKey;
+  await page.route("**/api/v1/auth/refresh", async (route) => {
+    attempts++;
+    const key = route.request().headers()["x-uptime-refresh-request"];
+    assert(key, "Refresh must carry an idempotency key");
+    if (attempts === 1) {
+      retryKey = key;
+      // Node fetch commits rotation without applying Set-Cookie to the browser.
+      const response = await fetch(route.request().url(), {
+        method: "POST", headers: route.request().headers(), body: route.request().postData(),
+      });
+      assert.equal(response.status, 200);
+      await response.arrayBuffer();
+      await route.abort("failed");
+    } else {
+      assert.equal(key, retryKey, "Retry must reuse the same key");
+      await route.continue();
+    }
+  });
+  assert.equal(await page.evaluate(() => window.authCheck.refreshSession()), true);
+  assert.equal(attempts, 2);
+  await page.unroute("**/api/v1/auth/refresh");
+  assert.equal((await page.evaluate(() => window.authCheck.authRequest("me"))).email, email);
+  console.log("PASS refresh recovery after committed rotation and lost response");
+
 
   await fill(page, "forgot-password");
   await page.getByRole("button", { name: "Отправить письмо" }).click();

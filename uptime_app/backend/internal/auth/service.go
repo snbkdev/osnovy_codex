@@ -2,12 +2,17 @@ package auth
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"time"
+	"uptime_app/backend/internal/avatar"
 )
 
 type Service struct {
+	Avatars   avatar.Store
 	Repo      Repository
 	Signer    Signer
 	Cipher    *Cipher
@@ -20,7 +25,7 @@ func NewService(repo Repository, signer Signer, cipher *Cipher, publicURL string
 	if err != nil {
 		return nil, err
 	}
-	return &Service{repo, signer, cipher, publicURL, hash}, nil
+	return &Service{Repo: repo, Signer: signer, Cipher: cipher, PublicURL: publicURL, dummyHash: hash}, nil
 }
 func (s *Service) letter(email, purpose, token string) ([]byte, error) {
 	path, subject := "/verify-email", "Подтвердите email"
@@ -30,7 +35,12 @@ func (s *Service) letter(email, purpose, token string) ([]byte, error) {
 	return s.Cipher.Encrypt(Letter{email, subject, fmt.Sprintf("%s в Uptime App:\n%s%s#token=%s\nЕсли вы не запрашивали письмо, проигнорируйте его.", subject, s.PublicURL, path, token)})
 }
 func (s *Service) Register(ctx context.Context, email, password string) error {
-	email, err := NormalizeEmail(email)
+	release, err := passwordSlot(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	email, err = NormalizeEmail(email)
 	if err != nil {
 		return err
 	}
@@ -65,13 +75,18 @@ func (s *Service) SendToken(ctx context.Context, email, purpose string) error {
 	return s.Repo.Issue(ctx, email, purpose, TokenHash(token), time.Now().Add(ttl), payload)
 }
 func (s *Service) Verify(ctx context.Context, token string) error {
-	if token == "" {
+	if !validToken(token) {
 		return ErrInvalid
 	}
 	return s.Repo.Verify(ctx, TokenHash(token), time.Now())
 }
 func (s *Service) Login(ctx context.Context, email, password string) (LoginResult, error) {
-	email, err := NormalizeEmail(email)
+	release, err := passwordSlot(ctx)
+	if err != nil {
+		return LoginResult{}, err
+	}
+	defer release()
+	email, err = NormalizeEmail(email)
 	if err != nil {
 		return LoginResult{}, ErrCredentials
 	}
@@ -104,13 +119,26 @@ func (s *Service) Login(ctx context.Context, email, password string) (LoginResul
 	}
 	return LoginResult{access, refresh, user}, nil
 }
-func (s *Service) Refresh(ctx context.Context, refresh string) (LoginResult, error) {
+func (s *Service) Refresh(ctx context.Context, refresh string, attempt ...string) (LoginResult, error) {
 	if refresh == "" {
 		return LoginResult{}, ErrUnauthorized
 	}
 	next := RandomToken()
+	requestHash := ""
+	if len(attempt) > 1 {
+		return LoginResult{}, ErrInvalid
+	}
+	if len(attempt) == 1 && attempt[0] != "" {
+		if !validToken(attempt[0]) {
+			return LoginResult{}, ErrInvalid
+		}
+		requestHash = TokenHash(attempt[0])
+		mac := hmac.New(sha256.New, s.Signer.Key)
+		mac.Write([]byte("uptime-refresh-retry-v1\x00" + refresh + "\x00" + attempt[0]))
+		next = base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	}
 	now := time.Now()
-	user, session, err := s.Repo.Rotate(ctx, TokenHash(refresh), TokenHash(next), now)
+	user, session, err := s.Repo.Rotate(ctx, TokenHash(refresh), TokenHash(next), now, requestHash)
 	if err != nil {
 		return LoginResult{}, err
 	}
@@ -127,7 +155,12 @@ func (s *Service) Logout(ctx context.Context, refresh string) error {
 	return s.Repo.Revoke(ctx, TokenHash(refresh), time.Now())
 }
 func (s *Service) Reset(ctx context.Context, token, password string) error {
-	if token == "" {
+	release, err := passwordSlot(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	if !validToken(token) {
 		return ErrInvalid
 	}
 	hash, err := HashPassword(password)
@@ -136,11 +169,19 @@ func (s *Service) Reset(ctx context.Context, token, password string) error {
 	}
 	return s.Repo.Reset(ctx, TokenHash(token), hash, time.Now())
 }
-func (s *Service) Me(ctx context.Context, bearer string) (User, error) {
+func (s *Service) Authenticate(ctx context.Context, bearer string) (Identity, error) {
 	now := time.Now()
 	claims, err := s.Signer.Parse(bearer, now)
 	if err != nil {
-		return User{}, err
+		return Identity{}, err
 	}
-	return s.Repo.Current(ctx, claims.Subject, claims.SessionID, now)
+	user, err := s.Repo.Current(ctx, claims.Subject, claims.SessionID, now)
+	if err != nil {
+		return Identity{}, err
+	}
+	return Identity{User: user, SessionID: claims.SessionID}, nil
+}
+func (s *Service) Me(ctx context.Context, bearer string) (User, error) {
+	identity, err := s.Authenticate(ctx, bearer)
+	return identity.User, err
 }

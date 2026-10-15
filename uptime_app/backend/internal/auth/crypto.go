@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -14,6 +15,7 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+	"uptime_app/backend/internal/identifier"
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/argon2"
@@ -34,13 +36,7 @@ func ValidatePassword(password string) error {
 	}
 	return nil
 }
-func RandomToken() string {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
-		panic(err)
-	}
-	return base64.RawURLEncoding.EncodeToString(b)
-}
+func RandomToken() string { return identifier.New() }
 func TokenHash(value string) string {
 	h := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(h[:])
@@ -129,4 +125,23 @@ func (c *Cipher) Decrypt(data []byte) (Letter, error) {
 	}
 	err = json.Unmarshal(plain, &letter)
 	return letter, err
+}
+
+// Bound CPU and memory across registration, login and reset in this process.
+var passwordSlots = make(chan struct{}, 2)
+
+func passwordSlot(ctx context.Context) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	select {
+	case passwordSlots <- struct{}{}:
+		return func() { <-passwordSlots }, nil
+	default:
+		return nil, ErrBusy
+	}
+}
+func validToken(value string) bool {
+	b, err := base64.RawURLEncoding.DecodeString(value)
+	return err == nil && len(b) == 32 && base64.RawURLEncoding.EncodeToString(b) == value
 }

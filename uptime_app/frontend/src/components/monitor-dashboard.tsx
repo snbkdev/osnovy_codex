@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createMonitor, formatInterval, listMonitors, type Monitor } from "@/lib/monitors";
+import { createMonitor, formatInterval, listMonitors, MONITOR_PAGE_SIZE, type Monitor } from "@/lib/monitors";
 
 export function MonitorDashboard() {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [moreBusy, setMoreBusy] = useState(false);
+  const [moreError, setMoreError] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -20,13 +23,23 @@ export function MonitorDashboard() {
 
   useEffect(() => {
     let active = true;
-    listMonitors().then((data) => { if (active) setMonitors(data); })
+    listMonitors().then((data) => { if (active) { setMonitors(data); setCursor(data.length === MONITOR_PAGE_SIZE ? data[data.length - 1].id : null); } })
       .catch((err: unknown) => { if (active) setLoadError(err instanceof Error ? err.message : "Не удалось загрузить сайты."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [attempt]);
   useEffect(() => { if (open) urlInput.current?.focus(); }, [open]);
 
+  async function loadMore() {
+    if (!cursor || moreBusy) return;
+    setMoreBusy(true); setMoreError("");
+    try {
+      const data = await listMonitors(cursor);
+      setMonitors((current) => [...current, ...data.filter((item) => !current.some((existing) => existing.id === item.id))]);
+      setCursor(data.length === MONITOR_PAGE_SIZE ? data[data.length - 1].id : null);
+    } catch (err) { setMoreError(err instanceof Error ? err.message : "Не удалось загрузить сайты."); }
+    finally { setMoreBusy(false); }
+  }
   function closeForm() {
     setOpen(false); setError(""); setURL(""); setAmount("5"); setUnit(60);
     addButton.current?.focus();
@@ -77,6 +90,8 @@ export function MonitorDashboard() {
         <p>Интервал: {formatInterval(monitor.interval_seconds)}</p>
         <span className="monitor-status">Ожидает запуска мониторинга</span>
       </li>)}</ul>}
+      {cursor && <button type="button" disabled={moreBusy} onClick={() => { void loadMore(); }}>{moreBusy ? "Загружаем…" : "Загрузить ещё"}</button>}
+      {moreError && <p role="alert">{moreError}</p>}
     </section>}
   </div>;
 }

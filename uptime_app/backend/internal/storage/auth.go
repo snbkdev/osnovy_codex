@@ -91,10 +91,14 @@ func (r *AuthRepository) CreateSession(ctx context.Context, user auth.User, s au
 		return err
 	})
 }
-func (r *AuthRepository) Rotate(ctx context.Context, oldHash, nextHash string, now time.Time) (auth.User, auth.Session, error) {
+func (r *AuthRepository) Rotate(ctx context.Context, oldHash, nextHash string, now time.Time, attempt ...string) (auth.User, auth.Session, error) {
 	var u userRow
 	var s sessionRow
 	denied := false
+	requestHash := ""
+	if len(attempt) > 0 {
+		requestHash = attempt[0]
+	}
 	err := r.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		var found sessionRow
 		if err := tx.NewRaw("SELECT s.* FROM sessions s JOIN refresh_tokens t ON t.session_id=s.id WHERE t.hash=?", oldHash).Scan(ctx, &found); err != nil {
@@ -108,6 +112,13 @@ func (r *AuthRepository) Rotate(ctx context.Context, oldHash, nextHash string, n
 		if err := tx.NewRaw("SELECT * FROM sessions WHERE id=? FOR UPDATE", found.ID).Scan(ctx, &s); err != nil {
 			return err
 		}
+		// Keyed retries use the database clock after acquiring the session lock.
+		// This avoids ordering failures when identical requests start concurrently.
+		if requestHash != "" {
+			if err := tx.NewRaw("SELECT clock_timestamp()").Scan(ctx, &now); err != nil {
+				return err
+			}
+		}
 		if s.RevokedAt != nil || !s.ExpiresAt.After(now) {
 			return auth.ErrUnauthorized
 		}
@@ -116,11 +127,20 @@ func (r *AuthRepository) Rotate(ctx context.Context, oldHash, nextHash string, n
 			return missing(err, auth.ErrUnauthorized)
 		}
 		if token.UsedAt != nil {
+			if requestHash != "" && token.RequestHash != nil && *token.RequestHash == requestHash && token.NextHash != nil && *token.NextHash == nextHash && !now.Before(*token.UsedAt) && now.Before(token.UsedAt.Add(auth.RefreshRetryWindow)) {
+				var available bool
+				if err := tx.NewRaw("SELECT EXISTS(SELECT 1 FROM refresh_tokens WHERE hash=? AND session_id=? AND used_at IS NULL)", nextHash, s.ID).Scan(ctx, &available); err != nil {
+					return err
+				}
+				if available {
+					return nil
+				}
+			}
 			denied = true
 			_, err := tx.ExecContext(ctx, "UPDATE sessions SET revoked_at=? WHERE id=?", now, s.ID)
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, "UPDATE refresh_tokens SET used_at=? WHERE hash=?", now, oldHash); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE refresh_tokens SET used_at=?,request_hash=NULLIF(?,''),next_hash=? WHERE hash=?", now, requestHash, nextHash, oldHash); err != nil {
 			return err
 		}
 		_, err = tx.ExecContext(ctx, "INSERT INTO refresh_tokens (hash,session_id) VALUES (?,?)", nextHash, s.ID)
