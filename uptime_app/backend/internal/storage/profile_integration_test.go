@@ -1,7 +1,10 @@
 package storage
 
 import (
+	"bytes"
 	"context"
+	"image"
+	"image/png"
 	"testing"
 	"uptime_app/backend/internal/auth"
 )
@@ -47,9 +50,41 @@ func TestPostgresProfile(t *testing.T) {
 	if err != nil || cleared.FullName != user.FullName || cleared.DateOfBirth != nil {
 		t.Fatal("clear failed", err)
 	}
+	var avatar bytes.Buffer
+	if err := png.Encode(&avatar, image.NewRGBA(image.Rect(0, 0, 32, 32))); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	uploaded, err := service.SaveAvatar(ctx, session.AccessToken, dir, bytes.NewReader(avatar.Bytes()))
+	if err != nil || uploaded.AvatarURL == "" || uploaded.FullName != user.FullName {
+		t.Fatal("upload failed", uploaded, err)
+	}
+	current, err = service.Me(ctx, session.AccessToken)
+	if err != nil || current.AvatarURL != uploaded.AvatarURL {
+		t.Fatal("avatar not persisted", current, err)
+	}
+	if _, err := service.UpdateProfile(ctx, session.AccessToken, "Новое имя", nil); err != nil {
+		t.Fatal(err)
+	}
+	current, err = service.Me(ctx, session.AccessToken)
+	if err != nil || current.AvatarURL != uploaded.AvatarURL {
+		t.Fatal("profile update lost avatar", current, err)
+	}
+	// A page reload restores the user through refresh before requesting /me.
+	refreshed, err := service.Refresh(ctx, session.RefreshToken)
+	if err != nil || refreshed.User.AvatarURL != uploaded.AvatarURL {
+		t.Fatal("session refresh lost avatar", refreshed.User, err)
+	}
+	current, err = service.Me(ctx, refreshed.AccessToken)
+	if err != nil || current.AvatarURL != uploaded.AvatarURL {
+		t.Fatal("restored session lost avatar", current, err)
+	}
+	session = refreshed
 	if err := service.Logout(ctx, session.RefreshToken); err != nil {
 		t.Fatal(err)
 	}
 	_, err = service.UpdateProfile(ctx, session.AccessToken, "revoked", nil)
+	requireError(t, err, auth.ErrUnauthorized)
+	_, err = service.SaveAvatar(ctx, session.AccessToken, dir, bytes.NewReader(avatar.Bytes()))
 	requireError(t, err, auth.ErrUnauthorized)
 }

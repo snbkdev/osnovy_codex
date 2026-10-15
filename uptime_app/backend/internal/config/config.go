@@ -14,6 +14,7 @@ import (
 )
 
 type Config struct {
+	AvatarDir                                  string
 	HTTPAddr, DatabaseURL                      string
 	MaxOpen, MaxIdle                           int
 	ConnLifetime                               time.Duration
@@ -73,6 +74,7 @@ func Load() (Config, error) {
 	if err != nil || len(c.MailKey) != 32 {
 		return c, fmt.Errorf("MAIL_ENCRYPTION_KEY must be base64 of 32 random bytes")
 	}
+	c.AvatarDir = env("AVATAR_DIR", "uploads/avatars")
 	c.Issuer = env("JWT_ISSUER", "uptime-api")
 	c.Audience = env("JWT_AUDIENCE", "uptime-web")
 	c.PublicURL = strings.TrimRight(env("PUBLIC_URL", "http://localhost:3000"), "/")

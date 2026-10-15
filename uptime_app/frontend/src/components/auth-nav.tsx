@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar } from "@/components/avatar";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
@@ -32,7 +33,7 @@ export function AuthNav() {
     }
   }}>
     <summary aria-label={`Профиль пользователя ${state.user.email}`}>
-      <span className="dashboard-avatar" aria-hidden="true">{(state.user.full_name || state.user.email)[0].toUpperCase()}</span>
+      <Avatar user={state.user} />
       <span className="dashboard-profile-label">{state.user.full_name || "Профиль"}<span>{state.user.email}</span></span>
       <span aria-hidden="true">⌄</span>
     </summary>

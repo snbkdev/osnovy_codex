@@ -35,6 +35,7 @@ type userDTO struct {
 	Email         string  `json:"email"`
 	EmailVerified bool    `json:"email_verified"`
 	FullName      string  `json:"full_name"`
+	AvatarURL     string  `json:"avatar_url"`
 	DateOfBirth   *string `json:"date_of_birth"`
 }
 
@@ -44,7 +45,7 @@ func dto(u auth.User) userDTO {
 		value := u.DateOfBirth.Format("2006-01-02")
 		birthday = &value
 	}
-	return userDTO{ID: u.ID, Email: u.Email, EmailVerified: u.EmailVerified, FullName: u.FullName, DateOfBirth: birthday}
+	return userDTO{ID: u.ID, Email: u.Email, EmailVerified: u.EmailVerified, FullName: u.FullName, AvatarURL: u.AvatarURL, DateOfBirth: birthday}
 }
 
 type authInput struct {

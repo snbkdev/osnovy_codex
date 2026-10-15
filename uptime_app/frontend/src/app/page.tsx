@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { AuthNav } from "@/components/auth-nav";
+import { MonitorDashboard } from "@/components/monitor-dashboard";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getAuthState, getServerAuthState, subscribeAuth } from "@/lib/auth";
 
@@ -10,7 +11,7 @@ export default function Home() {
  return <div className={user ? "dashboard" : undefined}>
   {user && <DashboardHeader />}
   <main className={user ? "dashboard-content" : undefined} aria-label="Содержимое дэшборда">
-   {!user && <AuthNav />}
+   {user ? <MonitorDashboard key={user.id} /> : <AuthNav />}
   </main>
  </div>;
 }

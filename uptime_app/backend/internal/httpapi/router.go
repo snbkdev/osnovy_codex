@@ -13,12 +13,27 @@ func NewAuthRouter(service authService, cfg config.Config) http.Handler {
 }
 
 func newRouter(service authService, cfg config.Config) http.Handler {
+	return NewApplicationRouter(service, nil, cfg)
+}
+
+func NewApplicationRouter(service authService, monitors monitorService, cfg config.Config) http.Handler {
 	mux := http.NewServeMux()
+	if cfg.AvatarDir == "" {
+		cfg.AvatarDir = "uploads/avatars"
+	}
+	mux.HandleFunc("GET /api/v1/avatars/{filename}", serveAvatar(cfg.AvatarDir))
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}` + "\n"))
 	})
 	if service != nil {
+		if monitors != nil {
+			mux.Handle("POST /api/v1/monitors", requireAuth(service, createMonitorHandler(monitors)))
+			mux.Handle("GET /api/v1/monitors", requireAuth(service, listMonitorsHandler(monitors)))
+		}
+		if avatars, ok := service.(avatarService); ok {
+			mux.Handle("POST /api/v1/auth/avatar", requireAuth(service, avatarHandler(avatars, cfg.AvatarDir)))
+		}
 		mux.Handle("/api/v1/auth/", &authHandler{service: service, config: cfg})
 		mux.Handle("POST /api/v1/auth/profile", requireAuth(service, http.HandlerFunc(profileHandler(service))))
 		mux.Handle("GET /api/v1/auth/me", requireAuth(service, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

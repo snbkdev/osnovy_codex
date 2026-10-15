@@ -17,6 +17,7 @@ type User struct {
 	ID, Email, PasswordHash string
 	EmailVerified           bool
 	FullName                string
+	AvatarURL               string
 	DateOfBirth             *time.Time
 }
 type Session struct {
@@ -31,6 +32,7 @@ type LoginResult struct {
 
 // Repository owns transaction boundaries; no ORM types escape storage.
 type Repository interface {
+	UpdateAvatar(context.Context, string, string, string, time.Time) (User, error)
 	Register(context.Context, User, string, time.Time, []byte) error
 	Issue(context.Context, string, string, string, time.Time, []byte) error
 	Verify(context.Context, string, time.Time) error

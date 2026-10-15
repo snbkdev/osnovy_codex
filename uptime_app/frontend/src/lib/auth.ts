@@ -1,4 +1,4 @@
-export type User = { id: string; email: string; email_verified: boolean; full_name: string; date_of_birth: string | null };
+export type User = { id: string; email: string; email_verified: boolean; full_name: string; avatar_url: string; date_of_birth: string | null };
 export type TokenResponse = { access_token: string; token_type: "Bearer"; expires_in: number; user: User };
 export class ApiError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); }
@@ -25,10 +25,10 @@ async function sessionLock<T>(work: () => Promise<T>): Promise<T> {
 async function request<T>(path: string, body?: unknown, bearer?: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`/api/v1/auth/${path}`, {
+    response = await fetch(path.startsWith("/api/v1/") ? path : `/api/v1/auth/${path}`, {
       method: body === undefined ? "GET" : "POST", credentials: "same-origin", cache: "no-store",
-      headers: { ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
-      body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20000),
+      headers: { ...(body === undefined || body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
+      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body), signal: AbortSignal.timeout(20000),
     });
   } catch { throw new ApiError(503, "service_unavailable", "Не удалось связаться с сервером. Попробуйте позже."); }
   const data = await response.json().catch(() => null);
@@ -98,6 +98,15 @@ export const publicAuthRequest = <T = { message: string }>(path: string, body: u
 export async function saveProfile(fullName: string, dateOfBirth: string) {
   const started = generation;
   const user = await authRequest<User>("profile", { full_name: fullName, date_of_birth: dateOfBirth || null });
+  if (started === generation && state.user?.id === user.id) update({ ...state, user });
+  return user;
+}
+
+export async function saveAvatar(file: Blob) {
+  const started = generation;
+  const body = new FormData();
+  body.append("avatar", file, "avatar.png");
+  const user = await authRequest<User>("avatar", body);
   if (started === generation && state.user?.id === user.id) update({ ...state, user });
   return user;
 }

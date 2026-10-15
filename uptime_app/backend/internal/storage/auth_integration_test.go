@@ -396,8 +396,13 @@ func TestPostgresMigrations(t *testing.T) {
 		t.Fatalf("repeat up: %+v %v", group, err)
 	}
 	list, err := m.MigrationsWithStatus(ctx)
-	if err != nil || len(list) != 2 || !list[0].IsApplied() || !list[1].IsApplied() {
+	if err != nil || len(list) != 4 {
 		t.Fatal("invalid status", err)
+	}
+	for _, migration := range list {
+		if !migration.IsApplied() {
+			t.Fatal("unapplied migration", migration.Name)
+		}
 	}
 	if _, err := m.Rollback(ctx); err != nil {
 		t.Fatal(err)

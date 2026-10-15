@@ -45,3 +45,33 @@ input { width: 100%; padding: 12px; border: 1px solid #aab4c6; border-radius: 6p
   .dashboard-profile-label span { max-width: 120px; }
   .dashboard-content { margin-top: 20px; }
 }
+
+.dashboard-avatar { overflow: hidden; flex-shrink: 0; }
+.dashboard-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-editor { border: 1px solid #cbd5e1; border-radius: 12px; padding: 20px; margin: 0 0 24px; display: grid; gap: 12px; }
+.avatar-file { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.avatar-preview { border-radius: 50%; object-fit: cover; }
+.avatar-crop-controls { display: grid; gap: 12px; }
+.avatar-crop { width: 256px; aspect-ratio: 1; max-width: 100%; overflow: hidden; position: relative; outline: 3px solid #2563eb; border-radius: 8px; background: #e2e8f0; }
+.avatar-crop img { position: absolute; max-width: none; }
+
+.monitor-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.monitor-heading h1 { margin-bottom: 12px; }
+.monitor-heading p { color: #526078; }
+.monitor-heading > button { flex-shrink: 0; }
+.monitor-interval-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.monitor-interval-fields select { width: 100%; min-width: 0; padding: 12px; border: 1px solid #aab4c6; border-radius: 6px; background: white; font: inherit; }
+.monitor-interval-fields select:focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+.monitor-form-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.secondary-button { background: #eeedff; color: #4338ca; }
+.monitor-list { margin: 0; padding: 0; list-style: none; }
+.monitor-list li { padding: 20px 0; border-bottom: 1px solid #dde3ec; }
+.monitor-list li:first-child { padding-top: 0; }
+.monitor-list li:last-child { padding-bottom: 0; border-bottom: 0; }
+.monitor-list a { overflow-wrap: anywhere; font-weight: 600; }
+.monitor-list p { margin: 12px 0 8px; }
+.monitor-status { display: inline-block; border-radius: 6px; padding: 6px 10px; background: #f4f6fa; color: #526078; font-size: 14px; }
+@media (max-width: 600px) {
+  .monitor-heading { align-items: flex-start; flex-direction: column; }
+  .monitor-interval-fields { grid-template-columns: 1fr; }
+}

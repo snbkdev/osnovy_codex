@@ -8,6 +8,7 @@ type userRow struct {
 	PasswordHash  string
 	EmailVerified bool
 	FullName      string
+	AvatarURL     string
 	DateOfBirth   *time.Time
 	CreatedAt     time.Time
 }

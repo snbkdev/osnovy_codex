@@ -22,3 +22,18 @@ func (r *AuthRepository) UpdateProfile(ctx context.Context, uid, sid, name strin
 	})
 	return publicUser(user), err
 }
+
+func (r *AuthRepository) UpdateAvatar(ctx context.Context, uid, sid, url string, now time.Time) (auth.User, error) {
+	var user userRow
+	err := r.DB.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := lockUser(ctx, tx, uid); err != nil {
+			return missing(err, auth.ErrUnauthorized)
+		}
+		var session sessionRow
+		if err := tx.NewRaw("SELECT * FROM sessions WHERE id=? AND user_id=? AND revoked_at IS NULL AND expires_at>? FOR UPDATE", sid, uid, now).Scan(ctx, &session); err != nil {
+			return missing(err, auth.ErrUnauthorized)
+		}
+		return missing(tx.NewRaw("UPDATE users SET avatar_url=? WHERE id=? AND email_verified=true RETURNING *", url, uid).Scan(ctx, &user), auth.ErrUnauthorized)
+	})
+	return publicUser(user), err
+}

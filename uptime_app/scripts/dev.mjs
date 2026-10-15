@@ -91,5 +91,5 @@ await new Promise((resolve, reject) => {
 await chmod(socketPath, 0o600);
 process.on("SIGINT", () => stop(130));
 process.on("SIGTERM", () => stop(143));
-start("backend", "bash", ["-c", 'set -e; set -a; env_file="${BACKEND_ENV_FILE:-./.env}"; if [ -f "$env_file" ]; then . "$env_file"; fi; set +a; exec go run ./cmd/api'], "backend/");
+start("backend", "bash", ["../scripts/backend-env.sh", "go", "run", "./cmd/api"], "backend/");
 start("frontend", "npm", ["run", "dev"], "frontend/");

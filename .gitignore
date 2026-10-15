@@ -62,3 +62,6 @@ pnpm-debug.log*
 ._*
 Thumbs.db
 Desktop.ini
+
+# Locally uploaded avatars
+/uptime_app/backend/uploads/

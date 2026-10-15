@@ -14,7 +14,7 @@ setup:
 	./scripts/setup.sh
 
 backend-dev:
-	cd backend && go run ./cmd/api
+	bash scripts/backend-env.sh go run ./cmd/api
 
 frontend-dev:
 	cd frontend && npm run dev
@@ -34,13 +34,13 @@ infra-down:
 	docker compose down
 
 migrate-up:
-	cd backend && go run ./cmd/migrate up
+	bash scripts/backend-env.sh go run ./cmd/migrate up
 
 migrate-status:
-	cd backend && go run ./cmd/migrate status
+	bash scripts/backend-env.sh go run ./cmd/migrate status
 
 migrate-down:
-	cd backend && go run ./cmd/migrate down
+	bash scripts/backend-env.sh go run ./cmd/migrate down
 
 test-integration:
 	@test -n "$$TEST_DATABASE_URL" || (echo "Set TEST_DATABASE_URL to a dedicated database ending in _test"; exit 1)

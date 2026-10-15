@@ -14,6 +14,7 @@ import (
 	"uptime_app/backend/internal/config"
 	"uptime_app/backend/internal/httpapi"
 	"uptime_app/backend/internal/mail"
+	"uptime_app/backend/internal/monitor"
 	"uptime_app/backend/internal/storage"
 )
 
@@ -51,7 +52,7 @@ func run() error {
 	defer func() { workerCancel(); <-workerDone }()
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewAuthRouter(service, cfg),
+		Handler:           httpapi.NewApplicationRouter(service, &monitor.Service{Repo: &storage.MonitorRepository{DB: db}}, cfg),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,
