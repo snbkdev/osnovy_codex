@@ -27,6 +27,8 @@ Use tabs for Makefile recipes. Keep setup scripts repeatable and preserve existi
 
 ## API Integration & Validation
 
+For database schema changes, follow [docs/guides/migrations.md](docs/guides/migrations.md) for migration creation, execution, rollback, and verification.
+
 The frontend proxies `/api/*` requests to the Go API through Next.js. Coordinate route, response, and configuration changes across both applications. The health endpoint is `/api/v1/health`.
 
 Run checks appropriate to the changed code. For integration changes, run `make check` and `make build`, then start both applications and verify the API status button. No project-wide coverage threshold is configured.

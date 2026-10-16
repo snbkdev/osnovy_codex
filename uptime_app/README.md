@@ -83,6 +83,24 @@ Access JWT живёт 24 часа и хранится только в памят
 
 ## Миграции и проверки
 
+### CORS
+
+Все маршруты API разрешают браузерные запросы только с точным `Origin`, заданным в `PUBLIC_URL` (схема, хост и порт). Чужой, `null`, пустой или повторный заголовок Origin отклоняется с 403 до вызова обработчика. Запросы без Origin продолжают работать для серверных клиентов; вход, refresh и logout по-прежнему требуют Origin. CORS не заменяет авторизацию.
+
+Preflight `OPTIONS` разрешает методы GET, HEAD, POST и заголовки Accept, Accept-Language, Content-Language, Content-Type, Authorization, X-Uptime-Refresh-Request. Поддерживаются credentials и чтение Retry-After; служебные заголовки доверенного прокси не разрешены браузерным клиентам. Next.js-прокси передаёт Origin и CORS-заголовки. Браузерный клиент продолжает использовать относительные `/api/*`; политика SameSite=Strict для refresh-cookie сохраняется.
+
+После изменения `PUBLIC_URL` перезапустите API. Для локального фронтенда используйте `http://localhost:3000`; `http://127.0.0.1:3000` — другой Origin. Пример проверки:
+
+```sh
+curl -i -X OPTIONS http://localhost:3000/api/v1/health \
+  -H 'Origin: http://localhost:3000' \
+  -H 'Access-Control-Request-Method: GET'
+```
+
+Ожидается 204 с `Access-Control-Allow-Origin: http://localhost:3000`; с `Origin: https://evil.test` ожидается 403 без разрешающего заголовка.
+
+### Миграции
+
 API проверяет подключение к БД и не изменяет схему автоматически. Перед запуском новой версии примените миграции:
 
 ```sh

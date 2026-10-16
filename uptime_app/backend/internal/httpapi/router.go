@@ -43,5 +43,5 @@ func NewLimitedApplicationRouter(service authService, monitors monitorService, c
 			jsonResponse(w, 200, dto(user))
 		})))
 	}
-	return mux
+	return cors(mux, cfg.PublicURL)
 }

@@ -39,7 +39,9 @@ func (s *stubService) Me(context.Context, string) (auth.User, error) {
 }
 func req(handler http.Handler, method, path, body, origin string) *httptest.ResponseRecorder {
 	r := httptest.NewRequest(method, "/api/v1/auth/"+path, strings.NewReader(body))
-	r.Header.Set("Origin", origin)
+	if origin != "" {
+		r.Header.Set("Origin", origin)
+	}
 	r.Header.Set("Authorization", "Bearer token")
 	r.AddCookie(&http.Cookie{Name: cookieName, Value: "refresh"})
 	w := httptest.NewRecorder()

@@ -63,8 +63,7 @@ pnpm-debug.log*
 Thumbs.db
 Desktop.ini
 
-# Locally uploaded avatars
 /uptime_app/backend/uploads/
 
-# Local code review notes
 /uptime_app/docs/code-review.md
+/uptime_app/docs/tmp
