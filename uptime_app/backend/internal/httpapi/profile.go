@@ -6,12 +6,21 @@ import (
 	"uptime_app/backend/internal/auth"
 )
 
+// @Summary Update profile
+// @Tags Profile
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body profileInput true "Request body"
+// @Success 200 {object} userDTO
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/profile [post]
 func profileHandler(service authService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var input struct {
-			FullName    string  `json:"full_name"`
-			DateOfBirth *string `json:"date_of_birth"`
-		}
+		var input profileInput
 		if !jsonInput(w, r, 16*1024, &input, "Проверьте данные профиля.") {
 			return
 		}

@@ -13,12 +13,21 @@ type monitorService interface {
 	List(context.Context, string, ...string) ([]monitor.Monitor, error)
 }
 
+// @Summary Create monitor
+// @Tags Monitors
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body monitorInput true "Request body"
+// @Success 201 {object} monitor.Monitor
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 409 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /monitors [post]
 func createMonitorHandler(service monitorService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var input struct {
-			URL             string `json:"url"`
-			IntervalSeconds int    `json:"interval_seconds"`
-		}
+		var input monitorInput
 		if !jsonInput(w, r, 4096, &input, "Укажите URL и целый интервал в секундах.") {
 			return
 		}
@@ -44,6 +53,16 @@ func createMonitorHandler(service monitorService) http.HandlerFunc {
 	}
 }
 
+// @Summary List monitors
+// @Tags Monitors
+// @Produce json
+// @Security BearerAuth
+// @Param before query string false "Pagination cursor"
+// @Success 200 {array} monitor.Monitor
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /monitors [get]
 func listMonitorsHandler(service monitorService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user := currentIdentity(r).User

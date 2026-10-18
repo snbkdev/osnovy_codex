@@ -213,7 +213,7 @@ func (h *authHandler) tokens(w http.ResponseWriter, result auth.LoginResult) {
 	h.cookie(w, result.RefreshToken, false)
 	jsonResponse(w, 200, map[string]any{"access_token": result.AccessToken, "token_type": "Bearer", "expires_in": int(auth.AccessTokenLifetime / time.Second), "user": dto(result.User)})
 }
-func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *authHandler) serveAction(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	action := strings.TrimPrefix(r.URL.Path, "/api/v1/auth/")
 	if r.Method != http.MethodPost {
@@ -305,3 +305,143 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type RateLimiter interface {
 	Allow(context.Context, []string, int, time.Duration) (bool, int, error)
 }
+
+func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch strings.TrimPrefix(r.URL.Path, "/api/v1/auth/") {
+	case "register":
+		h.register(w, r)
+	case "verify-email":
+		h.verifyEmail(w, r)
+	case "resend-verification":
+		h.resendVerification(w, r)
+	case "forgot-password":
+		h.forgotPassword(w, r)
+	case "reset-password":
+		h.resetPassword(w, r)
+	case "login":
+		h.login(w, r)
+	case "refresh":
+		h.refresh(w, r)
+	case "logout":
+		h.logout(w, r)
+	default:
+		h.serveAction(w, r)
+	}
+}
+
+// @Summary Register account
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body credentialsInput true "Request body"
+// @Success 202 {object} messageResponse
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 403 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/register [post]
+func (h *authHandler) register(w http.ResponseWriter, r *http.Request) { h.serveAction(w, r) }
+
+// @Summary Verify email
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body verificationInput true "Request body"
+// @Success 200 {object} messageResponse
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 403 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/verify-email [post]
+func (h *authHandler) verifyEmail(w http.ResponseWriter, r *http.Request) { h.serveAction(w, r) }
+
+// @Summary Resend verification email
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body emailInput true "Request body"
+// @Success 202 {object} messageResponse
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 403 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/resend-verification [post]
+func (h *authHandler) resendVerification(w http.ResponseWriter, r *http.Request) { h.serveAction(w, r) }
+
+// @Summary Request password reset
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body emailInput true "Request body"
+// @Success 202 {object} messageResponse
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 403 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/forgot-password [post]
+func (h *authHandler) forgotPassword(w http.ResponseWriter, r *http.Request) { h.serveAction(w, r) }
+
+// @Summary Reset password
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body resetInput true "Request body"
+// @Success 200 {object} messageResponse
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 403 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/reset-password [post]
+func (h *authHandler) resetPassword(w http.ResponseWriter, r *http.Request) { h.serveAction(w, r) }
+
+// @Summary Log in
+// @Tags Auth
+// @Description Uses the HttpOnly uptime_refresh cookie scoped to /api/v1/auth. Login and refresh set it; logout clears it.
+// @Accept json
+// @Produce json
+// @Param body body credentialsInput true "Request body"
+// @Param Origin header string true "Must match configured PUBLIC_URL"
+// @Success 200 {object} tokenResponse
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 403 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/login [post]
+func (h *authHandler) login(w http.ResponseWriter, r *http.Request) { h.serveAction(w, r) }
+
+// @Summary Refresh session
+// @Tags Auth
+// @Description Uses the HttpOnly uptime_refresh cookie scoped to /api/v1/auth. Login and refresh set it; logout clears it.
+// @Accept json
+// @Produce json
+// @Param Origin header string true "Must match configured PUBLIC_URL"
+// @Param X-Uptime-Refresh-Request header string false "Refresh request identifier"
+// @Success 200 {object} tokenResponse
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 403 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/refresh [post]
+func (h *authHandler) refresh(w http.ResponseWriter, r *http.Request) { h.serveAction(w, r) }
+
+// @Summary Log out
+// @Tags Auth
+// @Description Uses the HttpOnly uptime_refresh cookie scoped to /api/v1/auth. Login and refresh set it; logout clears it.
+// @Accept json
+// @Produce json
+// @Param Origin header string true "Must match configured PUBLIC_URL"
+// @Success 200 {object} messageResponse
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 403 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/logout [post]
+func (h *authHandler) logout(w http.ResponseWriter, r *http.Request) { h.serveAction(w, r) }

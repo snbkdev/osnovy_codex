@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,5 +18,48 @@ func TestHealth(t *testing.T) {
 	}
 	if recorder.Header().Get("Content-Type") != "application/json" {
 		t.Fatal("expected JSON")
+	}
+}
+
+func TestSwagger(t *testing.T) {
+	router := NewRouter()
+	for _, path := range []string{"/swagger/index.html", "/swagger/doc.json"} {
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d", path, recorder.Code)
+		}
+		if path == "/swagger/doc.json" {
+			var spec struct {
+				Swagger  string                                `json:"swagger"`
+				BasePath string                                `json:"basePath"`
+				Paths    map[string]map[string]json.RawMessage `json:"paths"`
+			}
+			if err := json.Unmarshal(recorder.Body.Bytes(), &spec); err != nil {
+				t.Fatal(err)
+			}
+			if spec.Swagger != "2.0" || spec.BasePath != "/api/v1" {
+				t.Fatalf("unexpected API metadata: %+v", spec)
+			}
+			expected := map[string][]string{
+				"/health": {"get"}, "/avatars/{filename}": {"get"},
+				"/auth/register": {"post"}, "/auth/verify-email": {"post"},
+				"/auth/resend-verification": {"post"}, "/auth/forgot-password": {"post"},
+				"/auth/reset-password": {"post"}, "/auth/login": {"post"},
+				"/auth/refresh": {"post"}, "/auth/logout": {"post"},
+				"/auth/me": {"get"}, "/auth/profile": {"post"}, "/auth/avatar": {"post"},
+				"/monitors": {"get", "post"},
+			}
+			if len(spec.Paths) != len(expected) {
+				t.Fatalf("documented paths = %d, want %d", len(spec.Paths), len(expected))
+			}
+			for route, methods := range expected {
+				for _, method := range methods {
+					if _, ok := spec.Paths[route][method]; !ok {
+						t.Errorf("missing operation: %s %s", method, route)
+					}
+				}
+			}
+		}
 	}
 }

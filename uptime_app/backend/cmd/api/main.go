@@ -19,6 +19,14 @@ import (
 	"uptime_app/backend/internal/storage"
 )
 
+// @title Uptime API
+// @version 1.0
+// @description API for authentication, profiles, avatars and uptime monitors.
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Enter Bearer followed by a space and the access token.
 func main() {
 	if err := run(); err != nil {
 		slog.Error("server stopped", "error", err)

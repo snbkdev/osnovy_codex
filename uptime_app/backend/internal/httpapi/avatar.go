@@ -17,6 +17,18 @@ type avatarService interface {
 	SaveAvatar(context.Context, auth.Identity, io.Reader) (auth.User, error)
 }
 
+// @Summary Upload avatar
+// @Tags Avatars
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param avatar formData file true "JPEG or PNG, up to 5 MiB and 4096 x 4096 pixels"
+// @Success 200 {object} userDTO
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 429 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/avatar [post]
 func avatarHandler(service avatarService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, auth.MaxAvatarBytes+64*1024)
@@ -44,6 +56,13 @@ func avatarHandler(service avatarService) http.HandlerFunc {
 	}
 }
 
+// @Summary Get avatar image
+// @Tags Avatars
+// @Produce image/png
+// @Param filename path string true "Avatar filename"
+// @Success 200 {file} file
+// @Failure 404 {string} string "Not found"
+// @Router /avatars/{filename} [get]
 func serveAvatar(dir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("filename")

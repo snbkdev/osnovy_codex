@@ -2,6 +2,9 @@ package httpapi
 
 import (
 	"net/http"
+
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+	_ "uptime_app/backend/docs"
 	"uptime_app/backend/internal/config"
 )
 
@@ -24,10 +27,8 @@ func NewLimitedApplicationRouter(service authService, monitors monitorService, c
 		cfg.AvatarDir = "uploads/avatars"
 	}
 	mux.HandleFunc("GET /api/v1/avatars/{filename}", serveAvatar(cfg.AvatarDir))
-	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}` + "\n"))
-	})
+	mux.HandleFunc("GET /api/v1/health", healthHandler)
+	mux.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 	if service != nil {
 		if monitors != nil {
 			mux.Handle("POST /api/v1/monitors", requireAuth(service, createMonitorHandler(monitors)))
@@ -38,10 +39,28 @@ func NewLimitedApplicationRouter(service authService, monitors monitorService, c
 		}
 		mux.Handle("/api/v1/auth/", &authHandler{service: service, config: cfg, shared: limits})
 		mux.Handle("POST /api/v1/auth/profile", requireAuth(service, http.HandlerFunc(profileHandler(service))))
-		mux.Handle("GET /api/v1/auth/me", requireAuth(service, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			user := currentIdentity(r).User
-			jsonResponse(w, 200, dto(user))
-		})))
+		mux.Handle("GET /api/v1/auth/me", requireAuth(service, http.HandlerFunc(meHandler)))
 	}
 	return cors(mux, cfg.PublicURL)
+}
+
+// @Summary Check API health
+// @Tags Health
+// @Produce json
+// @Success 200 {object} healthResponse
+// @Router /health [get]
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	jsonResponse(w, http.StatusOK, healthResponse{Status: "ok"})
+}
+
+// @Summary Get current user
+// @Tags Profile
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} userDTO
+// @Failure 401 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /auth/me [get]
+func meHandler(w http.ResponseWriter, r *http.Request) {
+	jsonResponse(w, http.StatusOK, dto(currentIdentity(r).User))
 }

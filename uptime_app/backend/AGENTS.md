@@ -36,6 +36,14 @@ Use Go's `testing` package and `net/http/httptest`. Place `*_test.go` beside the
 
 Preserve server timeouts and graceful shutdown when changing server initialization. Coordinate API contract changes with the frontend.
 
+## API Documentation (Swaggo)
+
+Every HTTP API route must have Swaggo annotations on its handler describing the method and path, parameters and request body, response schemas and status codes, and authentication requirements. Add annotations when introducing routes and update them whenever a route or its API behavior changes, including shared request and response types. Remove obsolete annotations when deleting routes.
+
+After any API contract change, run `make swagger` from `uptime_app/` to regenerate `backend/docs/docs.go`, `backend/docs/swagger.json`, and `backend/docs/swagger.yaml`. Include all regenerated files with the API changes; do not edit generated files manually. Keep the documented operation list in `internal/httpapi/router_test.go` synchronized when adding or removing routes, and run `go test ./internal/httpapi` from `backend/` to verify the served contract.
+
+Then run `make redoc` from `uptime_app/` to regenerate the standalone `backend/docs/redoc.html` from `backend/docs/swagger.json` and include it with the changes. Use `make swagger redoc` to update the contract and HTML together.
+
 ## Configuration
 
 Go reads process variables; `backend/.env` is not loaded automatically. Set `HTTP_ADDR` to change the listening address, for example `HTTP_ADDR=:8081 go run ./cmd/api`. Update `.env.example` for new settings and match the frontend's `API_URL` to the configured address.

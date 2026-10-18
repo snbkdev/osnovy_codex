@@ -1,4 +1,4 @@
-.PHONY: setup dev stop backend-dev frontend-dev build check infra-up infra-down migrate-up migrate-status migrate-down test-integration test-auth-browser
+.PHONY: swagger redoc setup dev stop backend-dev frontend-dev build check infra-up infra-down migrate-up migrate-status migrate-down test-integration test-auth-browser
 .DEFAULT_GOAL := setup
 
 dev:
@@ -45,3 +45,9 @@ migrate-down:
 test-integration:
 	@test -n "$$TEST_DATABASE_URL" || (echo "Set TEST_DATABASE_URL to a dedicated database ending in _test"; exit 1)
 	cd backend && go test -race -count=1 ./...
+
+swagger:
+	cd backend && go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g cmd/api/main.go --parseInternal --output docs
+
+redoc:
+	npx --yes @redocly/cli@1.34.3 build-docs backend/docs/swagger.json --output backend/docs/redoc.html --disableGoogleFont
