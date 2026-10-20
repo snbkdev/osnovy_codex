@@ -10,3 +10,6 @@ export function formatInterval(seconds: number) {
   if (seconds % 60 === 0) return `${seconds / 60} мин`;
   return `${seconds} сек`;
 }
+
+export const updateMonitor = (id: string, url: string, intervalSeconds: number) => authRequest<Monitor>(`/api/v1/monitors/${encodeURIComponent(id)}`, { url, interval_seconds: intervalSeconds }, "PUT");
+export const deleteMonitor = (id: string) => authRequest<void>(`/api/v1/monitors/${encodeURIComponent(id)}`, undefined, "DELETE");

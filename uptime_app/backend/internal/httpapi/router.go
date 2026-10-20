@@ -31,6 +31,8 @@ func NewLimitedApplicationRouter(service authService, monitors monitorService, c
 	mux.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 	if service != nil {
 		if monitors != nil {
+			mux.Handle("PUT /api/v1/monitors/{id}", requireAuth(service, updateMonitorHandler(monitors)))
+			mux.Handle("DELETE /api/v1/monitors/{id}", requireAuth(service, deleteMonitorHandler(monitors)))
 			mux.Handle("POST /api/v1/monitors", requireAuth(service, createMonitorHandler(monitors)))
 			mux.Handle("GET /api/v1/monitors", requireAuth(service, listMonitorsHandler(monitors)))
 		}

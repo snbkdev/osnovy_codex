@@ -76,15 +76,15 @@ export async function logout() {
     await request("logout", {}); generation++; clear(); channel?.postMessage("logout");
   });
 }
-export async function authRequest<T>(path: string, body?: unknown): Promise<T> {
+export async function authRequest<T>(path: string, body?: unknown, method?: "GET" | "POST" | "PUT" | "DELETE"): Promise<T> {
   if (!accessToken && !(await refreshSession())) throw new ApiError(401, "unauthorized", "Войдите в аккаунт.");
   const usedToken = accessToken;
-  try { return await request<T>(path, body, usedToken || undefined); }
+  try { return await request<T>(path, body, usedToken || undefined, {}, method); }
   catch (err) {
     if (!(err instanceof ApiError) || err.status !== 401) throw err;
     // Another request may already have replaced this access token.
     if (accessToken === usedToken && !(await refreshSession())) throw err;
-    return request<T>(path, body, accessToken || undefined);
+    return request<T>(path, body, accessToken || undefined, {}, method);
   }
 }
 export const publicAuthRequest = <T = { message: string }>(path: string, body: unknown) => request<T>(path, body);

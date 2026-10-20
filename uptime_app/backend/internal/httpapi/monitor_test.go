@@ -97,3 +97,80 @@ func TestMonitorHTTP(t *testing.T) {
 		t.Fatal("revoked session accepted", w.Code)
 	}
 }
+
+func (r *monitorRepositoryStub) Update(_ context.Context, owner, id, url string, interval int) (monitor.Monitor, error) {
+	if r.err != nil {
+		return monitor.Monitor{}, r.err
+	}
+	for i, value := range r.values {
+		if value.ID == id && value.UserID == owner {
+			value.URL = url
+			value.IntervalSeconds = interval
+			r.values[i] = value
+			return value, nil
+		}
+	}
+	return monitor.Monitor{}, monitor.ErrNotFound
+}
+func (r *monitorRepositoryStub) Delete(_ context.Context, owner, id string) error {
+	if r.err != nil {
+		return r.err
+	}
+	for i, value := range r.values {
+		if value.ID == id && value.UserID == owner {
+			r.values = append(r.values[:i], r.values[i+1:]...)
+			return nil
+		}
+	}
+	return monitor.ErrNotFound
+}
+
+func TestMonitorMutationHTTP(t *testing.T) {
+	repo := &monitorRepositoryStub{values: []monitor.Monitor{{ID: "site", UserID: "id", URL: "https://example.com/", IntervalSeconds: 60}, {ID: "foreign", UserID: "other"}}}
+	handler := NewApplicationRouter(&stubService{}, &monitor.Service{Repo: repo}, config.Config{})
+	request := func(method, id, body string, authenticated bool) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, "/api/v1/monitors/"+id, strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		if authenticated {
+			r.Header.Set("Authorization", "Bearer token")
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	valid := `{"url":"https://NEW.example.com","interval_seconds":5}`
+	for _, method := range []string{"PUT", "DELETE"} {
+		if w := request(method, "site", valid, false); w.Code != 401 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		for _, id := range []string{"missing", "foreign"} {
+			if w := request(method, id, valid, true); w.Code != 404 || !strings.Contains(w.Body.String(), "monitor_not_found") {
+				t.Fatal(w.Code, w.Body.String())
+			}
+		}
+	}
+	for _, body := range []string{`{}`, `null`, `[]`, `{`, `{"url":"https://example.com","interval_seconds":5.5}`, `{"url":"https://example.com","interval_seconds":4}`, valid + ` {}`, `{"url":"https://example.com","interval_seconds":5,"user_id":"other"}`} {
+		if w := request("PUT", "site", body, true); w.Code != 400 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	w := request("PUT", "site", valid, true)
+	var updated monitor.Monitor
+	if err := json.Unmarshal(w.Body.Bytes(), &updated); err != nil || w.Code != 200 || updated.URL != "https://new.example.com/" || updated.IntervalSeconds != 5 {
+		t.Fatal(w.Code, w.Body.String(), err)
+	}
+	repo.err = errors.New("unavailable")
+	for _, method := range []string{"PUT", "DELETE"} {
+		if w := request(method, "site", valid, true); w.Code != 503 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	repo.err = nil
+	w = request("DELETE", "site", "", true)
+	if w.Code != 204 || w.Body.Len() != 0 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	if w := request("DELETE", "site", "", true); w.Code != 404 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}

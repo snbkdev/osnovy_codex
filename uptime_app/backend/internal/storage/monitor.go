@@ -60,3 +60,15 @@ func (r *MonitorRepository) List(ctx context.Context, userID string, cursor ...s
 	}
 	return result, nil
 }
+
+func (r *MonitorRepository) Update(ctx context.Context, userID, id, url string, interval int) (monitor.Monitor, error) {
+	var row monitorRow
+	err := r.DB.NewRaw("UPDATE monitors SET url=?,interval_seconds=? WHERE user_id=? AND id=? RETURNING *", url, interval, userID, id).Scan(ctx, &row)
+	return publicMonitor(row), missing(err, monitor.ErrNotFound)
+}
+
+func (r *MonitorRepository) Delete(ctx context.Context, userID, id string) error {
+	var deletedID string
+	err := r.DB.NewRaw("DELETE FROM monitors WHERE user_id=? AND id=? RETURNING id", userID, id).Scan(ctx, &deletedID)
+	return missing(err, monitor.ErrNotFound)
+}

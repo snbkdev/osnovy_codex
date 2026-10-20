@@ -20,6 +20,7 @@ const MaxMonitors = 100
 const PageSize = 20
 
 var ErrUnauthorized = errors.New("monitor_unauthorized")
+var ErrNotFound = errors.New("monitor_not_found")
 var ErrQuota = errors.New("monitor_quota")
 
 var ErrInvalid = errors.New("invalid_monitor")
@@ -33,6 +34,8 @@ type Monitor struct {
 }
 
 type Repository interface {
+	Update(context.Context, string, string, string, int) (Monitor, error)
+	Delete(context.Context, string, string) error
 	Create(context.Context, Monitor) (Monitor, error)
 	List(context.Context, string, ...string) ([]Monitor, error)
 }
@@ -106,4 +109,24 @@ func (s *Service) List(ctx context.Context, userID string, cursor ...string) ([]
 		return nil, ErrInvalid
 	}
 	return s.Repo.List(ctx, userID, cursor...)
+}
+
+func (s *Service) Update(ctx context.Context, userID, id, rawURL string, interval int) (Monitor, error) {
+	if userID == "" {
+		return Monitor{}, ErrUnauthorized
+	}
+	normalized, err := normalizeURL(rawURL)
+	if id == "" || len(id) > 128 || err != nil || interval < MinIntervalSeconds || interval > MaxIntervalSeconds {
+		return Monitor{}, ErrInvalid
+	}
+	return s.Repo.Update(ctx, userID, id, normalized, interval)
+}
+func (s *Service) Delete(ctx context.Context, userID, id string) error {
+	if userID == "" {
+		return ErrUnauthorized
+	}
+	if id == "" || len(id) > 128 {
+		return ErrInvalid
+	}
+	return s.Repo.Delete(ctx, userID, id)
 }

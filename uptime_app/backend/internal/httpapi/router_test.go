@@ -48,7 +48,8 @@ func TestSwagger(t *testing.T) {
 				"/auth/reset-password": {"post"}, "/auth/login": {"post"},
 				"/auth/refresh": {"post"}, "/auth/logout": {"post"},
 				"/auth/me": {"get"}, "/auth/profile": {"post"}, "/auth/avatar": {"post"},
-				"/monitors": {"get", "post"},
+				"/monitors":      {"get", "post"},
+				"/monitors/{id}": {"put", "delete"},
 			}
 			if len(spec.Paths) != len(expected) {
 				t.Fatalf("documented paths = %d, want %d", len(spec.Paths), len(expected))

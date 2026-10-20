@@ -25,7 +25,7 @@ func cors(next http.Handler, publicURL string) http.Handler {
 		}
 		if preflight {
 			switch r.Header.Get("Access-Control-Request-Method") {
-			case http.MethodGet, http.MethodHead, http.MethodPost:
+			case http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodDelete:
 			default:
 				apiError(w, http.StatusForbidden, "invalid_cors_request", "Недопустимый CORS-запрос.")
 				return
@@ -45,7 +45,7 @@ func cors(next http.Handler, publicURL string) http.Handler {
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		w.Header().Set("Access-Control-Expose-Headers", "Retry-After")
 		if preflight {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE")
 			w.Header().Set("Access-Control-Allow-Headers", "Accept, Accept-Language, Content-Language, Content-Type, Authorization, X-Uptime-Refresh-Request")
 			w.WriteHeader(http.StatusNoContent)
 			return

@@ -141,6 +141,63 @@ try {
   await page.getByRole("button", { name: "Отмена", exact: true }).click();
   assert.equal(await page.locator("#create-monitor").count(), 0);
   console.log("PASS monitor creation at 5 seconds and 7 minutes, persistence, cancel");
+  // Keep the two original records so later pagination assertions remain meaningful.
+  await page.getByRole("button", { name: "Редактировать https://example.com/status", exact: true }).click();
+  assert.equal(await page.getByLabel("Проверять каждые", { exact: true }).inputValue(), "5");
+  assert.equal(await page.locator("#monitor-unit").inputValue(), "1");
+  await page.getByLabel("URL сайта", { exact: true }).fill("https://example.com/cancelled");
+  await page.getByRole("button", { name: "Отмена", exact: true }).click();
+  await page.getByRole("link", { name: "https://example.com/status", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Редактировать https://example.com/status", exact: true }).click();
+  await page.getByLabel("URL сайта", { exact: true }).fill("https://example.com/edited");
+  await page.getByLabel("Проверять каждые", { exact: true }).fill("7");
+  await page.locator("#monitor-unit").selectOption("60");
+  let mutationPath;
+  let updateAttempts = 0;
+  await page.route("**/api/v1/monitors/*", async (route) => {
+    if (route.request().method() !== "PUT") return route.continue();
+    mutationPath = new URL(route.request().url()).pathname;
+    updateAttempts++;
+    if (updateAttempts === 1) return route.fulfill({ status: 503, json: { error: { code: "service_unavailable", message: "Тестовая ошибка сохранения." } } });
+    if (updateAttempts === 2) return route.fulfill({ status: 401, json: { error: { code: "unauthorized", message: "Обновите сессию." } } });
+    return route.continue();
+  });
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+  await visible(page, "Тестовая ошибка сохранения.");
+  assert.equal(await page.getByLabel("URL сайта", { exact: true }).inputValue(), "https://example.com/edited");
+  const savedResponse = page.waitForResponse((res) => res.request().method() === "PUT" && res.status() === 200);
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+  const saved = await (await savedResponse).json();
+  assert.equal(saved.interval_seconds, 420);
+  assert.equal(updateAttempts, 3, "PUT must survive token refresh with the original body");
+  await page.unroute("**/api/v1/monitors/*");
+  await visible(page, "Изменения сохранены.");
+  await page.reload();
+  await page.getByRole("link", { name: "https://example.com/edited", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Удалить https://example.com/edited", exact: true }).click();
+  const confirmation = page.getByRole("region", { name: "Подтверждение удаления" });
+  await confirmation.getByRole("button", { name: "Отмена", exact: true }).click();
+  await page.getByRole("link", { name: "https://example.com/edited", exact: true }).waitFor();
+  // Delete a temporary site, checking that a failed DELETE leaves the record visible.
+  await page.getByRole("button", { name: "Добавить сайт", exact: true }).click();
+  await page.getByLabel("URL сайта", { exact: true }).fill("https://example.com/delete-me");
+  await page.getByRole("button", { name: "Создать точку", exact: true }).click();
+  await page.getByRole("button", { name: "Удалить https://example.com/delete-me", exact: true }).click();
+  await page.route("**/api/v1/monitors/*", (route) => route.request().method() === "DELETE" ? route.fulfill({ status: 503, json: { error: { code: "service_unavailable", message: "Тестовая ошибка удаления." } } }) : route.continue());
+  await confirmation.getByRole("button", { name: "Удалить", exact: true }).click();
+  await visible(page, "Тестовая ошибка удаления.");
+  await page.getByRole("link", { name: "https://example.com/delete-me", exact: true }).waitFor();
+  await page.unroute("**/api/v1/monitors/*");
+  const deletedResponse = page.waitForResponse((res) => res.request().method() === "DELETE");
+  await confirmation.getByRole("button", { name: "Удалить", exact: true }).click();
+  assert.equal((await deletedResponse).status(), 204);
+  await visible(page, "Сайт удалён.");
+  await page.reload();
+  await poll(async () => await page.locator(".monitor-list li").count() === 2);
+  assert.equal(await page.getByRole("link", { name: "https://example.com/delete-me", exact: true }).count(), 0);
+  assert(mutationPath?.startsWith("/api/v1/monitors/"));
+  console.log("PASS monitor editing, cancel, error preservation, refreshed PUT, confirmed DELETE and persistence");
+
   await page.locator(".dashboard-profile summary").waitFor();
   await page.locator(".dashboard-profile summary").click();
   await page.getByRole("link", { name: "Редактировать профиль" }).click();
@@ -263,8 +320,13 @@ try {
   }
   await page.reload();
   await poll(async () => await page.locator(".monitor-list li").count() === 20);
+  const boundaryURL = await page.locator(".monitor-list li").last().getByRole("link").getAttribute("href");
+  await page.getByRole("button", { name: `Удалить ${boundaryURL}`, exact: true }).click();
+  await page.getByRole("region", { name: "Подтверждение удаления" }).getByRole("button", { name: "Удалить", exact: true }).click();
+  await visible(page, "Сайт удалён.");
+  await poll(async () => await page.locator(".monitor-list li").count() === 20);
   await page.getByRole("button", { name: "Загрузить ещё", exact: true }).click();
-  await poll(async () => await page.locator(".monitor-list li").count() === 23);
+  await poll(async () => await page.locator(".monitor-list li").count() === 22);
   assert.equal(await page.getByRole("button", { name: "Загрузить ещё", exact: true }).count(), 0);
   console.log("PASS monitor creation and cursor pagination through proxy");
   // Reload replaces the page context; reinstall the test client.

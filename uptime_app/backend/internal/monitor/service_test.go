@@ -81,3 +81,78 @@ func TestListMonitors(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func (r *stubRepository) Update(_ context.Context, owner, id, url string, interval int) (Monitor, error) {
+	if r.err != nil {
+		return Monitor{}, r.err
+	}
+	for i, value := range r.created {
+		if value.ID == id && value.UserID == owner {
+			value.URL = url
+			value.IntervalSeconds = interval
+			r.created[i] = value
+			return value, nil
+		}
+	}
+	return Monitor{}, ErrNotFound
+}
+func (r *stubRepository) Delete(_ context.Context, owner, id string) error {
+	if r.err != nil {
+		return r.err
+	}
+	for i, value := range r.created {
+		if value.ID == id && value.UserID == owner {
+			r.created = append(r.created[:i], r.created[i+1:]...)
+			return nil
+		}
+	}
+	return ErrNotFound
+}
+
+func TestMonitorMutations(t *testing.T) {
+	ctx := context.Background()
+	repo := &stubRepository{}
+	service := &Service{Repo: repo}
+	original, err := service.Create(ctx, "owner", "https://example.com", 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := service.Update(ctx, "owner", original.ID, " https://NEW.example.com#fragment ", 5)
+	if err != nil || updated.URL != "https://new.example.com/" || updated.ID != original.ID || !updated.CreatedAt.Equal(original.CreatedAt) {
+		t.Fatal(updated, err)
+	}
+	for _, interval := range []int{0, 4, MaxIntervalSeconds + 1} {
+		if _, err := service.Update(ctx, "owner", original.ID, "https://example.com", interval); !errors.Is(err, ErrInvalid) {
+			t.Fatal(err)
+		}
+	}
+	if _, err := service.Update(ctx, "owner", original.ID, "ftp://example.com", 60); !errors.Is(err, ErrInvalid) {
+		t.Fatal(err)
+	}
+	if _, err := service.Update(ctx, "", original.ID, "https://example.com", 60); !errors.Is(err, ErrUnauthorized) {
+		t.Fatal(err)
+	}
+	if err := service.Delete(ctx, "", original.ID); !errors.Is(err, ErrUnauthorized) {
+		t.Fatal(err)
+	}
+	if _, err := service.Update(ctx, "other", original.ID, "https://example.com", 60); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	if err := service.Delete(ctx, "other", original.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+	repo.err = errors.New("unavailable")
+	if _, err := service.Update(ctx, "owner", original.ID, "https://example.com", 60); !errors.Is(err, repo.err) {
+		t.Fatal(err)
+	}
+	if err := service.Delete(ctx, "owner", original.ID); !errors.Is(err, repo.err) {
+		t.Fatal(err)
+	}
+	repo.err = nil
+	if err := service.Delete(ctx, "owner", original.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Delete(ctx, "owner", original.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+}

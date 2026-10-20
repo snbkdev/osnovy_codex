@@ -70,7 +70,7 @@ input { width: 100%; padding: 12px; border: 1px solid #aab4c6; border-radius: 6p
 .monitor-list li:last-child { padding-bottom: 0; border-bottom: 0; }
 .monitor-list a { overflow-wrap: anywhere; font-weight: 600; }
 .monitor-list p { margin: 12px 0 8px; }
-.monitor-status { display: inline-block; border-radius: 6px; padding: 6px 10px; background: #f4f6fa; color: #526078; font-size: 14px; }
+.monitor-status { display: inline-block; margin-top: 12px; border-radius: 6px; padding: 6px 10px; background: #f4f6fa; color: #526078; font-size: 14px; }
 @media (max-width: 600px) {
   .monitor-heading { align-items: flex-start; flex-direction: column; }
   .monitor-interval-fields { grid-template-columns: 1fr; }

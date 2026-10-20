@@ -662,6 +662,83 @@ paths:
       summary: Create monitor
       tags:
       - Monitors
+  /monitors/{id}:
+    delete:
+      parameters:
+      - description: Monitor ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Monitor deleted
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete monitor
+      tags:
+      - Monitors
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Monitor ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Request body
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.monitorInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/monitor.Monitor'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.errorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update monitor
+      tags:
+      - Monitors
 securityDefinitions:
   BearerAuth:
     description: Enter Bearer followed by a space and the access token.
