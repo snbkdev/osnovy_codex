@@ -4,3 +4,10 @@ args = ["scripts/postgres-mcp.sh"]
 cwd = "/Users/asanbeksamudin/Documents/projects/mine/ai_tools/codex/osnovy/uptime_app"
 startup_timeout_sec = 60
 tool_timeout_sec = 60
+
+[mcp_servers.playwright]
+command = "npx"
+# Pin the tested version to keep it compatible with the installed Firefox build.
+args = ["-y", "@playwright/mcp@0.0.83", "--browser", "firefox"]
+startup_timeout_sec = 60
+tool_timeout_sec = 60

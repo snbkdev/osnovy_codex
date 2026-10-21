@@ -28,6 +28,19 @@ Use Go 1.25+. Run these commands from `backend/`:
 
 From the application root, `make backend-dev` starts the API.
 
+## Database Inspection via MCP
+
+Use the PostgreSQL MCP server (`postgres`) to inspect schemas and read data needed for development. Discover the available `mcp__postgres__*` tools in the current session; connection settings belong to the MCP server configuration, not tool arguments.
+
+1. Confirm the connection with `mcp__postgres__execute_sql({"sql":"SELECT current_database() AS database_name, current_schema() AS schema_name;"})`. Do not assume MCP connects to the same database as the API or integration tests.
+2. Discover schemas with `mcp__postgres__list_schemas({})`, then tables with `mcp__postgres__list_objects({"schema_name":"public","object_type":"table"})`.
+3. Inspect columns, keys, and relationships with `mcp__postgres__get_object_details({"schema_name":"public","object_name":"monitors","object_type":"table"})`. Use actual schema and table names returned by discovery.
+4. Read data with `mcp__postgres__execute_sql({"sql":"SELECT count(*) AS monitor_count FROM public.monitors;"})`. For row samples, select only needed columns, add relevant filters, use a deterministic `ORDER BY`, and bound results with `LIMIT` (usually 20–50 rows). Avoid `SELECT *`.
+
+The SQL tool is read-only. Apply schema changes through [the migration workflow](../docs/guides/migrations.md). Do not expose password hashes, tokens, credentials, mail payloads, or unnecessary personal data in results, logs, documentation, or fixtures. Prefer counts and anonymized examples when real values are unnecessary.
+
+If PostgreSQL MCP tools are unavailable or the connection fails, report the limitation instead of inventing results. Repository migrations and storage models describe the expected schema, but do not establish the current database state.
+
 ## Coding Style & Testing
 
 Use `gofmt`, tab indentation, lowercase package names, and PascalCase exported identifiers. Keep HTTP routing in `internal/httpapi/` and configuration defaults in `internal/config/`.

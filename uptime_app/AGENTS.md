@@ -33,6 +33,14 @@ The frontend proxies `/api/*` requests to the Go API through Next.js. Coordinate
 
 Run checks appropriate to the changed code. For integration changes, run `make check` and `make build`, then start both applications and verify the API status button. No project-wide coverage threshold is configured.
 
+## Browser Work & Required Implementation Verification
+
+Use **Playwright MCP** for all agent-driven browser work in this project: navigation, interaction, screenshots, console messages, and network inspection. Existing Playwright test scripts complement this verification and do not replace it.
+
+After implementing a task that affects application behavior or UI, load and follow [playwright-verification](.codex/skills/playwright-verification/SKILL.md) before reporting completion. Verify the affected functionality and rendered layout through Playwright MCP, fix defects within the task scope, and repeat affected checks after fixes. This also applies to backend changes that affect browser-visible behavior.
+
+For documentation-only changes or changes with no browser-observable effect, explicitly state why browser verification is not applicable. If Playwright MCP or a required local service is unavailable, report the blocker and unverified scenarios; do not claim verification passed or silently substitute another browser tool.
+
 ## Commit & Pull Request Guidelines
 
 The initial Git history has no formal commit convention. Use concise, descriptive subjects and keep commits focused.

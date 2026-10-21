@@ -67,3 +67,5 @@ Desktop.ini
 
 /uptime_app/docs/code-review.md
 /uptime_app/docs/tmp
+
+.playwright-mcp
