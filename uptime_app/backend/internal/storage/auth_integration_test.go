@@ -396,7 +396,7 @@ func TestPostgresMigrations(t *testing.T) {
 		t.Fatalf("repeat up: %+v %v", group, err)
 	}
 	list, err := m.MigrationsWithStatus(ctx)
-	if err != nil || len(list) != 6 {
+	if err != nil || len(list) != 8 {
 		t.Fatal("invalid status", err)
 	}
 	for _, migration := range list {

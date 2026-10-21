@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"uptime_app/backend/internal/auth"
 	"uptime_app/backend/internal/config"
@@ -171,6 +172,50 @@ func TestMonitorMutationHTTP(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	if w := request("DELETE", "site", "", true); w.Code != 404 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+}
+
+func (r *monitorRepositoryStub) History(ctx context.Context, owner, id string, from, to time.Time) (monitor.History, error) {
+	if r.err != nil {
+		return monitor.History{}, r.err
+	}
+	values := r.values
+	for _, value := range values {
+		if value.ID == id && value.UserID == owner {
+			return monitor.History{Monitor: value, From: from, To: to, BucketSeconds: 300, Buckets: []monitor.HistoryBucket{}}, nil
+		}
+	}
+	return monitor.History{}, monitor.ErrNotFound
+}
+
+func TestMonitorHistoryHTTP(t *testing.T) {
+	repo := &monitorRepositoryStub{values: []monitor.Monitor{{ID: "site", UserID: "id", URL: "https://example.com/"}, {ID: "foreign", UserID: "other"}}}
+	handler := NewApplicationRouter(&stubService{}, &monitor.Service{Repo: repo}, config.Config{})
+	request := func(id string, authenticated bool) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("GET", "/api/v1/monitors/"+id+"/history", nil)
+		if authenticated {
+			r.Header.Set("Authorization", "Bearer token")
+		}
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	if w := request("site", false); w.Code != 401 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	for _, id := range []string{"foreign", "missing"} {
+		if w := request(id, true); w.Code != 404 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	w := request("site", true)
+	var history monitor.History
+	if err := json.Unmarshal(w.Body.Bytes(), &history); err != nil || w.Code != 200 || history.Monitor.ID != "site" || history.BucketSeconds != 300 || history.Buckets == nil || history.To.Sub(history.From) != 24*time.Hour || strings.Contains(w.Body.String(), "user_id") || w.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal(w.Code, w.Body.String(), err)
+	}
+	repo.err = errors.New("storage unavailable")
+	if w := request("site", true); w.Code != 503 {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }

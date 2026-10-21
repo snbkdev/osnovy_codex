@@ -742,6 +742,7 @@
                         "BearerAuth": []
                     }
                 ],
+                "description": "Returns the latest automatic GET check. Only HTTP 200 is successful; redirects are not followed. Checks run while the API is running.",
                 "produces": [
                     "application/json"
                 ],
@@ -968,6 +969,64 @@
                     }
                 }
             }
+        },
+        "/monitors/{id}/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns five-minute buckets for the last 24 hours, for the monitor's current URL. Empty periods have no samples. Only the owner can access history.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Monitors"
+                ],
+                "summary": "Get monitor availability history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Monitor ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/monitor.History"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.errorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.errorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.errorResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.errorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1124,17 +1183,66 @@
                 }
             }
         },
+        "monitor.History": {
+            "type": "object",
+            "properties": {
+                "bucket_seconds": {
+                    "type": "integer"
+                },
+                "buckets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/monitor.HistoryBucket"
+                    }
+                },
+                "from": {
+                    "type": "string"
+                },
+                "monitor": {
+                    "$ref": "#/definitions/monitor.Monitor"
+                },
+                "to": {
+                    "type": "string"
+                }
+            }
+        },
+        "monitor.HistoryBucket": {
+            "type": "object",
+            "properties": {
+                "failure": {
+                    "type": "integer"
+                },
+                "start": {
+                    "type": "string"
+                },
+                "success": {
+                    "type": "integer"
+                }
+            }
+        },
         "monitor.Monitor": {
             "type": "object",
             "properties": {
+                "check_error": {
+                    "type": "string"
+                },
+                "checked_at": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
+                },
+                "http_status": {
+                    "type": "integer"
                 },
                 "id": {
                     "type": "string"
                 },
                 "interval_seconds": {
                     "type": "integer"
+                },
+                "status": {
+                    "type": "string"
                 },
                 "url": {
                     "type": "string"

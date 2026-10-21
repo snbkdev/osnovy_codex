@@ -69,9 +69,38 @@ input { width: 100%; padding: 12px; border: 1px solid #aab4c6; border-radius: 6p
 .monitor-list li:first-child { padding-top: 0; }
 .monitor-list li:last-child { padding-bottom: 0; border-bottom: 0; }
 .monitor-list a { overflow-wrap: anywhere; font-weight: 600; }
+.monitor-site { display: flex; align-items: center; gap: 12px; }
+.monitor-site span { min-width: 0; }
+.monitor-icon { flex-shrink: 0; width: 32px; height: 32px; border-radius: 6px; object-fit: contain; }
 .monitor-list p { margin: 12px 0 8px; }
 .monitor-status { display: inline-block; margin-top: 12px; border-radius: 6px; padding: 6px 10px; background: #f4f6fa; color: #526078; font-size: 14px; }
 @media (max-width: 600px) {
   .monitor-heading { align-items: flex-start; flex-direction: column; }
   .monitor-interval-fields { grid-template-columns: 1fr; }
 }
+
+.monitor-status-success { color: #15803d; }
+.monitor-status-error { color: #b91c1c; }
+
+.monitor-chart-link { display: inline-flex; align-items: center; padding: 12px 18px; border-radius: 6px; text-decoration: none; font-weight: 400 !important; }
+.history-url { overflow-wrap: anywhere; }
+.history-card { min-width: 0; }
+.history-card h2 { margin-top: 0; }
+.history-summary { font-weight: 600; }
+.history-legend { display: flex; flex-wrap: wrap; gap: 12px 24px; list-style: none; padding: 0; font-size: 14px; }
+.history-legend li { display: flex; gap: 8px; align-items: center; }
+.history-key { display: inline-block; width: 14px; height: 14px; border-radius: 3px; }
+.history-success { background: #16a34a; }
+.history-failure { background: #dc2626; }
+.history-unknown { background: #cbd5e1; }
+.history-hint { color: #526078; font-size: 14px; }
+.history-scroll { overflow-x: auto; padding: 8px 4px; }
+.history-scroll:focus-visible { outline: 3px solid #818cf8; outline-offset: 3px; }
+.history-plot { min-width: 700px; }
+.history-bars { display: flex; gap: 1px; height: 160px; border-bottom: 1px solid #aab4c6; }
+.history-bar { flex: 1; display: flex; flex-direction: column; min-width: 1px; height: 100%; padding: 0; border-radius: 0; background: #cbd5e1; }
+.history-bar span { display: block; width: 100%; pointer-events: none; }
+.history-bar:hover, .history-bar[aria-pressed="true"] { outline: 2px solid #182235; outline-offset: 1px; z-index: 1; }
+.history-bar:focus-visible { outline: 3px solid #4338ca; outline-offset: 2px; z-index: 2; }
+.history-axis { display: flex; justify-content: space-between; margin-top: 12px; color: #526078; font-size: 12px; }
+.history-detail { min-height: 3em; padding: 12px; background: #f4f6fa; border-radius: 6px; }

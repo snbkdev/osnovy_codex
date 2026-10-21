@@ -26,14 +26,19 @@ var ErrQuota = errors.New("monitor_quota")
 var ErrInvalid = errors.New("invalid_monitor")
 
 type Monitor struct {
-	ID              string    `json:"id"`
-	UserID          string    `json:"-"`
-	URL             string    `json:"url"`
-	IntervalSeconds int       `json:"interval_seconds"`
-	CreatedAt       time.Time `json:"created_at"`
+	Status          string     `json:"status"`
+	HTTPStatus      int        `json:"http_status"`
+	CheckError      string     `json:"check_error"`
+	CheckedAt       *time.Time `json:"checked_at"`
+	ID              string     `json:"id"`
+	UserID          string     `json:"-"`
+	URL             string     `json:"url"`
+	IntervalSeconds int        `json:"interval_seconds"`
+	CreatedAt       time.Time  `json:"created_at"`
 }
 
 type Repository interface {
+	History(context.Context, string, string, time.Time, time.Time) (History, error)
 	Update(context.Context, string, string, string, int) (Monitor, error)
 	Delete(context.Context, string, string) error
 	Create(context.Context, Monitor) (Monitor, error)

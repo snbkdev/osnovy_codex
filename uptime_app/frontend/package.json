@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test:favicon": "npm run build && node --test scripts/favicon-check.test.mjs",
     "test:auth-browser": "node scripts/auth-browser-check.mjs",
     "test:monitors-browser": "node scripts/monitors-browser-check.mjs"
   },

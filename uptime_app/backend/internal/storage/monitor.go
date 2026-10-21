@@ -14,6 +14,12 @@ type MonitorRepository struct{ DB *bun.DB }
 var _ monitor.Repository = (*MonitorRepository)(nil)
 
 type monitorRow struct {
+	Status          string
+	HTTPStatus      int
+	CheckError      string
+	CheckedAt       *time.Time
+	NextCheckAt     time.Time
+	CheckToken      string
 	ID              string
 	UserID          string
 	URL             string
@@ -22,7 +28,7 @@ type monitorRow struct {
 }
 
 func publicMonitor(row monitorRow) monitor.Monitor {
-	return monitor.Monitor{ID: row.ID, UserID: row.UserID, URL: row.URL, IntervalSeconds: row.IntervalSeconds, CreatedAt: row.CreatedAt}
+	return monitor.Monitor{Status: row.Status, HTTPStatus: row.HTTPStatus, CheckError: row.CheckError, CheckedAt: row.CheckedAt, ID: row.ID, UserID: row.UserID, URL: row.URL, IntervalSeconds: row.IntervalSeconds, CreatedAt: row.CreatedAt}
 }
 
 func (r *MonitorRepository) Create(ctx context.Context, value monitor.Monitor) (monitor.Monitor, error) {
@@ -63,7 +69,7 @@ func (r *MonitorRepository) List(ctx context.Context, userID string, cursor ...s
 
 func (r *MonitorRepository) Update(ctx context.Context, userID, id, url string, interval int) (monitor.Monitor, error) {
 	var row monitorRow
-	err := r.DB.NewRaw("UPDATE monitors SET url=?,interval_seconds=? WHERE user_id=? AND id=? RETURNING *", url, interval, userID, id).Scan(ctx, &row)
+	err := r.DB.NewRaw("UPDATE monitors SET url=?,interval_seconds=?,status='pending',http_status=0,check_error='',checked_at=NULL,next_check_at=now(),check_token='' WHERE user_id=? AND id=? RETURNING *", url, interval, userID, id).Scan(ctx, &row)
 	return publicMonitor(row), missing(err, monitor.ErrNotFound)
 }
 

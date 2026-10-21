@@ -9,6 +9,7 @@ import (
 )
 
 type monitorService interface {
+	History(context.Context, string, string) (monitor.History, error)
 	Update(context.Context, string, string, string, int) (monitor.Monitor, error)
 	Delete(context.Context, string, string) error
 	Create(context.Context, string, string, int) (monitor.Monitor, error)
@@ -55,6 +56,7 @@ func createMonitorHandler(service monitorService) http.HandlerFunc {
 	}
 }
 
+// @Description Returns the latest automatic GET check. Only HTTP 200 is successful; redirects are not followed. Checks run while the API is running.
 // @Summary List monitors
 // @Tags Monitors
 // @Produce json
@@ -148,4 +150,26 @@ func monitorMutationError(w http.ResponseWriter, err error) bool {
 		serviceError(w, err)
 	}
 	return true
+}
+
+// @Summary Get monitor availability history
+// @Description Returns five-minute buckets for the last 24 hours, for the monitor's current URL. Empty periods have no samples. Only the owner can access history.
+// @Tags Monitors
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Monitor ID"
+// @Success 200 {object} monitor.History
+// @Failure 400 {object} errorResponse
+// @Failure 401 {object} errorResponse
+// @Failure 404 {object} errorResponse
+// @Failure 503 {object} errorResponse
+// @Router /monitors/{id}/history [get]
+func monitorHistoryHandler(service monitorService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		history, err := service.History(r.Context(), currentIdentity(r).User.ID, r.PathValue("id"))
+		if monitorMutationError(w, err) {
+			return
+		}
+		jsonResponse(w, http.StatusOK, history)
+	}
 }

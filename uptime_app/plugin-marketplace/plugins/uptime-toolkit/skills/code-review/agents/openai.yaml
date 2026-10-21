@@ -1,0 +1,3 @@
+interface:
+  display_name: "Project Code Review"
+  short_description: "Ревью Go и Next.js с чек-листом и приоритетами P0–P3"

@@ -1,10 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { MonitorIcon } from "@/components/monitor-icon";
 import { ApiError } from "@/lib/http-client";
-import { deleteMonitor, updateMonitor, createMonitor, formatInterval, listMonitors, MONITOR_PAGE_SIZE, type Monitor } from "@/lib/monitors";
+import { deleteMonitor, updateMonitor, createMonitor, formatInterval, monitorStatus, listMonitors, MONITOR_PAGE_SIZE, type Monitor } from "@/lib/monitors";
 
 export function MonitorDashboard() {
+  const [refreshError, setRefreshError] = useState("");
+  const [refreshAttempt, setRefreshAttempt] = useState(0);
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [moreBusy, setMoreBusy] = useState(false);
@@ -33,6 +37,36 @@ export function MonitorDashboard() {
     return () => { active = false; };
   }, [attempt]);
   useEffect(() => { if (open) urlInput.current?.focus(); }, [open]);
+
+  useEffect(() => {
+    if (loading || loadError || busy || moreBusy || open || deleting || monitors.length === 0) return;
+    let active = true;
+    const timer = setTimeout(async () => {
+      try {
+        const updates: Monitor[] = [];
+        let before: string | undefined;
+        // Refresh every loaded page, preserving pagination and the visible list.
+        for (let page = 0; page < Math.ceil(monitors.length / MONITOR_PAGE_SIZE); page++) {
+          const data = await listMonitors(before);
+          if (!active) return;
+          updates.push(...data);
+          if (data.length < MONITOR_PAGE_SIZE) break;
+          before = data[data.length - 1].id;
+        }
+        if (active) {
+          setMonitors(updates);
+          setCursor(updates.length && updates.length % MONITOR_PAGE_SIZE === 0 ? updates[updates.length - 1].id : null);
+          setRefreshError("");
+        }
+      } catch {
+        if (active) {
+          setRefreshError("Не удалось обновить статусы. Повторим автоматически.");
+          setRefreshAttempt((value) => value + 1);
+        }
+      }
+    }, 5000);
+    return () => { active = false; clearTimeout(timer); };
+  }, [monitors, loading, loadError, busy, moreBusy, open, deleting, refreshAttempt]);
 
   async function loadMore() {
     if (!cursor || moreBusy || busy || open || deleting) return;
@@ -114,6 +148,8 @@ export function MonitorDashboard() {
     } finally { setBusy(false); }
   }
 
+  const visibleMonitors = monitors.filter((monitor) => monitor.id !== editing?.id);
+
   return <div className="monitor-dashboard">
     <div className="monitor-heading">
       <div><h1>Мои сайты</h1><p>Создайте точки мониторинга и задайте частоту проверки.</p></div>
@@ -138,15 +174,18 @@ export function MonitorDashboard() {
       {error && <p role="alert">{error}</p>}
     </section>}
     {message && <p role="status">{message}</p>}
-    {loading ? <p role="status">Загружаем сайты…</p> : loadError ? <section><p role="alert">{loadError}</p><button type="button" onClick={() => { setLoading(true); setLoadError(""); setAttempt((value) => value + 1); }}>Повторить загрузку</button></section> : <section aria-label="Точки мониторинга">
-      {monitors.length === 0 ? <p>Сайтов пока нет. Нажмите «Добавить сайт», чтобы создать первую точку.</p> : <ul className="monitor-list">{monitors.map((monitor) => <li key={monitor.id}>
-        <a href={monitor.url} target="_blank" rel="noopener noreferrer">{monitor.url}</a>
+    {refreshError && <p role="status">{refreshError}</p>}
+    {loading ? <p role="status">Загружаем сайты…</p> : loadError ? <section><p role="alert">{loadError}</p><button type="button" onClick={() => { setLoading(true); setLoadError(""); setAttempt((value) => value + 1); }}>Повторить загрузку</button></section> : <section aria-label="Точки мониторинга" hidden={editing !== null && visibleMonitors.length === 0 && !cursor}>
+      {monitors.length === 0 ? <p>Сайтов пока нет. Нажмите «Добавить сайт», чтобы создать первую точку.</p> : <ul className="monitor-list">{visibleMonitors.map((monitor) => <li key={monitor.id}>
+        <a className="monitor-site" href={monitor.url} target="_blank" rel="noopener noreferrer"><MonitorIcon url={monitor.url} /><span>{monitor.url}</span></a>
         <p>Интервал: {formatInterval(monitor.interval_seconds)}</p>
         <div className="monitor-form-actions">
+          <Link className="secondary-button monitor-chart-link" href={`/monitors/${encodeURIComponent(monitor.id)}/history`} aria-label={`График истории ${monitor.url}`}>График</Link>
           <button type="button" className="secondary-button" disabled={busy || moreBusy} aria-label={`Редактировать ${monitor.url}`} onClick={(event) => startEdit(monitor, event.currentTarget)}>Редактировать</button>
           <button type="button" className="secondary-button" disabled={busy || moreBusy} aria-label={`Удалить ${monitor.url}`} onClick={(event) => { returnFocus.current = event.currentTarget; setOpen(false); setEditing(null); setDeleting(monitor); setError(""); setMessage(""); }}>Удалить</button>
         </div>
-        <span className="monitor-status">Ожидает запуска мониторинга</span>
+        <span className={`monitor-status monitor-status-${monitor.status}`}>{monitorStatus(monitor)}</span>
+        {monitor.checked_at && <p className="field-hint">Последняя проверка: <time dateTime={monitor.checked_at}>{new Date(monitor.checked_at).toLocaleString("ru-RU")}</time></p>}
       </li>)}</ul>}
       {cursor && <button type="button" disabled={moreBusy || busy || open || !!deleting} onClick={() => { void loadMore(); }}>{moreBusy ? "Загружаем…" : "Загрузить ещё"}</button>}
       {moreError && <p role="alert">{moreError}</p>}

@@ -31,15 +31,15 @@ For database schema changes, follow [docs/guides/migrations.md](docs/guides/migr
 
 The frontend proxies `/api/*` requests to the Go API through Next.js. Coordinate route, response, and configuration changes across both applications. The health endpoint is `/api/v1/health`.
 
-Run checks appropriate to the changed code. For integration changes, run `make check` and `make build`, then start both applications and verify the API status button. No project-wide coverage threshold is configured.
+Run checks appropriate to the changed code. For integration changes, run `make check` and `make build`, leave verification of the API status button in the browser to the user. No project-wide coverage threshold is configured.
 
-## Browser Work & Required Implementation Verification
+## Browser Verification
 
-Use **Playwright MCP** for all agent-driven browser work in this project: navigation, interaction, screenshots, console messages, and network inspection. Existing Playwright test scripts complement this verification and do not replace it.
+Правило пользователя: «Не нужно запускать открытие браузера, запускаю и проверяю сам».
 
-After implementing a task that affects application behavior or UI, load and follow [playwright-verification](.codex/skills/playwright-verification/SKILL.md) before reporting completion. Verify the affected functionality and rendered layout through Playwright MCP, fix defects within the task scope, and repeat affected checks after fixes. This also applies to backend changes that affect browser-visible behavior.
+Do not open a browser or run browser checks (including Playwright MCP and browser test scripts) unless the user explicitly requests them. The user starts the application and verifies browser behavior and layout themselves. This rule overrides the automatic browser verification requirement in the playwright-verification skill.
 
-For documentation-only changes or changes with no browser-observable effect, explicitly state why browser verification is not applicable. If Playwright MCP or a required local service is unavailable, report the blocker and unverified scenarios; do not claim verification passed or silently substitute another browser tool.
+Continue running appropriate non-browser checks. In the completion report, distinguish checks actually performed from browser verification left to the user; do not claim browser verification passed.
 
 ## Commit & Pull Request Guidelines
 

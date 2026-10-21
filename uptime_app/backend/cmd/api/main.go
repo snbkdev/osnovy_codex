@@ -61,10 +61,13 @@ func run() error {
 	go func() { defer close(workerDone); worker.Run(workerCtx) }()
 	maintenanceDone := make(chan struct{})
 	go func() { defer close(maintenanceDone); storage.RunMaintenance(workerCtx, db, cfg.AvatarDir) }()
-	defer func() { workerCancel(); <-workerDone; <-maintenanceDone }()
+	monitorRepo := &storage.MonitorRepository{DB: db}
+	monitorDone := make(chan struct{})
+	go func() { defer close(monitorDone); monitorRepo.RunChecks(workerCtx) }()
+	defer func() { workerCancel(); <-workerDone; <-maintenanceDone; <-monitorDone }()
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
-		Handler:           httpapi.NewLimitedApplicationRouter(service, &monitor.Service{Repo: &storage.MonitorRepository{DB: db}}, cfg, &storage.RateLimiter{DB: db}),
+		Handler:           httpapi.NewLimitedApplicationRouter(service, &monitor.Service{Repo: monitorRepo}, cfg, &storage.RateLimiter{DB: db}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		WriteTimeout:      15 * time.Second,

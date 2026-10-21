@@ -1,0 +1,3 @@
+interface:
+  display_name: "Swaggo Routes"
+  short_description: "Документирование Go API через Swaggo-аннотации"

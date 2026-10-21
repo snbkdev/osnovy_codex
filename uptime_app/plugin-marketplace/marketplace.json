@@ -1,0 +1,20 @@
+{
+  "name": "asanbek-personal",
+  "interface": {
+    "displayName": "Asanbek Personal"
+  },
+  "plugins": [
+    {
+      "name": "uptime-toolkit",
+      "source": {
+        "source": "local",
+        "path": "./plugins/uptime-toolkit"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

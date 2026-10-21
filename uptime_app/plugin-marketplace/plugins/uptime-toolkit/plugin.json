@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "uptime-toolkit",
+  "version": "0.1.0",
+  "description": "Проектные скиллы для разработки uptime_app.",
+  "author": {
+    "name": "Asanbek Samudin"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Uptime Toolkit",
+        "shortDescription": "Скиллы проекта uptime_app",
+        "longDescription": "Ревью Go и Next.js, коммиты, стендапы, документация Swaggo и браузерная проверка по явному запросу.",
+        "developerName": "Asanbek Samudin",
+        "category": "Productivity",
+        "capabilities": [],
+        "defaultPrompt": [
+          "Проведи ревью текущих изменений uptime_app",
+          "Подготовь стендап за вчера",
+          "Синхронизируй документацию API uptime_app"
+        ]
+      }
+    }
+  }
+}

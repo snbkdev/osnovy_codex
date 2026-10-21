@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 type stubRepository struct {
@@ -155,4 +156,17 @@ func TestMonitorMutations(t *testing.T) {
 	if err := service.Delete(ctx, "owner", original.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
+}
+
+func (r *stubRepository) History(ctx context.Context, owner, id string, from, to time.Time) (History, error) {
+	if r.err != nil {
+		return History{}, r.err
+	}
+	values := r.created
+	for _, value := range values {
+		if value.ID == id && value.UserID == owner {
+			return History{Monitor: value, From: from, To: to, BucketSeconds: 300, Buckets: []HistoryBucket{}}, nil
+		}
+	}
+	return History{}, ErrNotFound
 }
