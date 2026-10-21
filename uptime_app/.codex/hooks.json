@@ -2,11 +2,36 @@
     "hooks": {
         "PreToolUse": [
             {
+                "matcher": "apply_patch|Edit|MultiEdit|Write|Delete",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash .codex/hooks/protect-migrations.sh"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "bash .codex/hooks/notify-stop.sh"
+                    }
+                ]
+            }
+        ],
+        "PostToolUse": [
+            {
                 "matcher": "apply_patch|Edit|Write",
                 "hooks": [
                     {
                         "type": "command",
                         "command": ".codex/hooks/gofmt.sh"
+                    },
+                    {
+                        "type": "command",
+                        "command": "bash .codex/hooks/eslint.sh"
                     }
                 ]
             }
